@@ -653,6 +653,12 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    }
 }
 
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+{
+   // Only IFGR should be used for adjusting the overall system gain.
+   this->setGain(direction, channel, "IFGR", value);
+}
+
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
@@ -667,6 +673,12 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
    }
 
    return 0;
+}
+
+double SoapySDRPlay::getGain(const int direction, const size_t channel) const
+{
+   // Only IFGR should be used for adjusting the overall system gain.
+   return this->getGain(direction, channel, "IFGR");
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
@@ -696,6 +708,12 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
       return SoapySDR::Range(0, 27);
    }
     return SoapySDR::Range(20, 59);
+}
+
+SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
+{
+   // Only IFGR should be used for adjusting the overall system gain.
+   return this->getGainRange(direction, channel, "IFGR");
 }
 
 /*******************************************************************
