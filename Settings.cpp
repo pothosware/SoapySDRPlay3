@@ -591,7 +591,7 @@ std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size
     //the functions below have a "name" parameter
     std::vector<std::string> results;
 
-    results.push_back("IFGR");
+    results.push_back("IF");
     results.push_back("RFGR");
 
     return results;
@@ -630,12 +630,15 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
    bool doUpdate = false;
 
-   if (name == "IFGR" && chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
+   if (name == "IF" && chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
    {
-      //apply the change if the required value is different from gRdB 
-      if (chParams->tunerParams.gain.gRdB != (int)value)
+      int new_gRdB = -((int)value);
+      //apply the change if the required value is different from gRdB
+      // gRdB is a gain *reduction*, so we negate the SoapySDR "IF gain"
+      // in order to obtain the new gRdB.
+      if (chParams->tunerParams.gain.gRdB != new_gRdB)
       {
-         chParams->tunerParams.gain.gRdB = (int)value;
+         chParams->tunerParams.gain.gRdB = new_gRdB;
          doUpdate = true;
       }
    }
@@ -655,17 +658,18 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
 {
-   // Only IFGR should be used for adjusting the overall system gain.
-   this->setGain(direction, channel, "IFGR", value);
+   // Only IF should be used for adjusting the overall system gain.
+   this->setGain(direction, channel, "IF", value);
 }
 
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-   if (name == "IFGR")
+   if (name == "IF")
    {
-       return chParams->tunerParams.gain.gRdB;
+       // gRdB is a gain *reduction*, so we negate it to obtain the SoapySDR "IF gain".
+       return -chParams->tunerParams.gain.gRdB;
    }
    else if (name == "RFGR")
    {
@@ -677,17 +681,13 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
 
 double SoapySDRPlay::getGain(const int direction, const size_t channel) const
 {
-   // Only IFGR should be used for adjusting the overall system gain.
-   return this->getGain(direction, channel, "IFGR");
+   // Only IF should be used for adjusting the overall system gain.
+   return this->getGain(direction, channel, "IF");
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
 {
-   if (name == "IFGR")
-   {
-      return SoapySDR::Range(20, 59);
-   }
-   else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSP1_ID))
+   if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSP1_ID))
    {
       return SoapySDR::Range(0, 3);
    }
@@ -707,13 +707,16 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    {
       return SoapySDR::Range(0, 27);
    }
-    return SoapySDR::Range(20, 59);
+   else  // IF gain
+   {
+      return SoapySDR::Range(-59, -20);
+   }
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
 {
-   // Only IFGR should be used for adjusting the overall system gain.
-   return this->getGainRange(direction, channel, "IFGR");
+   // Only IF should be used for adjusting the overall system gain.
+   return this->getGainRange(direction, channel, "IF");
 }
 
 /*******************************************************************
