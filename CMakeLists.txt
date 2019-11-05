@@ -32,11 +32,12 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     add_definitions(-Wno-unused-parameter)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
-# Configurable feature set
-SET (RF_GAIN_IN_MENU ON CACHE BOOL "Add Rf gain as a setting, additionally to the IFGR gain control")
+# The SDRPlay LNA state, aka "RF gain", is more properly a setting than a gain.
+# However, some users may prefer to also expose it as a SoapySDR gain.
+SET (LNA_STATE_AS_GAIN OFF CACHE BOOL "Duplicate the lna_state setting as a SoapySDR gain.")
 
-IF(RF_GAIN_IN_MENU)
-    ADD_DEFINITIONS( -DRF_GAIN_IN_MENU=1 )
+IF(LNA_STATE_AS_GAIN)
+    ADD_DEFINITIONS( -DLNA_STATE_AS_GAIN=1 )
 ENDIF()
 
 SET (STREAMING_USB_MODE_BULK OFF CACHE BOOL "Use USB bulk mode instead of isochronous")

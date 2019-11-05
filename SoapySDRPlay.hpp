@@ -262,6 +262,7 @@ private:
     sdrplay_api_DeviceParamsT *deviceParams;
     sdrplay_api_RxChannelParamsT *chParams;
     std::string hardwareKey;
+    int maxLnaState;
 
     //cached settings
     double outputSampleRate;
