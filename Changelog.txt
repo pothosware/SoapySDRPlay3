@@ -1,0 +1,17 @@
+Release 0.3.0 (pending)
+==========================
+
+- Implement filter by serial number for enumeration
+- Enumeration can yield the already opened device:
+  Allows the device to be found again in the same process
+  and fixes multiple clients to work with SoapySDR server
+
+Release 0.2.0 (2019-01-07)
+==========================
+
+- support API 2.13 and identify RSPduo
+
+Release 0.1.0 (2016-10-16)
+==========================
+
+- Initial release of Soapy SDRPlay support module
