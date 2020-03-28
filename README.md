@@ -13,7 +13,7 @@
 
 The MIT License (MIT)
 
-Copyright (c) 2015 Charles J. Cliffe
+Copyright (c) 2015 Charles J. Cliffe<br/>
 Copyright (c) 2020 Franco Venturi - changes for SDRplay API version 3 and Dual Tuner for RSPduo
 
 
