@@ -26,6 +26,13 @@
 
 #include "SoapySDRPlay.hpp"
 
+#if defined(_M_X64) || defined(_M_IX86)
+#define strcasecmp _stricmp
+#elif defined (__GNUC__)
+#include <strings.h>
+#endif
+
+
 // globals declared in Registration.cpp
 extern sdrplay_api_DeviceT *deviceSelected;
 extern SoapySDR::Stream *activeStream;
