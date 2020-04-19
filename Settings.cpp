@@ -521,6 +521,18 @@ std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) 
                 return "Tuner 2 50 ohm";
         }
     }
+    else if (device.hwVer == SDRPLAY_RSPdx_ID)
+    {
+        if (deviceParams->devParams->rspDxParams.antennaSel == sdrplay_api_RspDx_ANTENNA_A) {
+            return "Antenna A";
+        }
+        else if (deviceParams->devParams->rspDxParams.antennaSel == sdrplay_api_RspDx_ANTENNA_B) {
+            return "Antenna B";
+        }
+        else if (deviceParams->devParams->rspDxParams.antennaSel == sdrplay_api_RspDx_ANTENNA_C) {
+            return "Antenna C";
+        }
+    }
 
     return "RX";
 }
