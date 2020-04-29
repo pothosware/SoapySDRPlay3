@@ -169,4 +169,4 @@ static SoapySDR::Device *makeSDRPlay(const SoapySDR::Kwargs &args)
     return new SoapySDRPlay(args);
 }
 
-static SoapySDR::Registry registerSDRPlay("sdrPlay", &findSDRPlay, &makeSDRPlay, SOAPY_SDR_ABI_VERSION);
+static SoapySDR::Registry registerSDRPlay("sdrplay", &findSDRPlay, &makeSDRPlay, SOAPY_SDR_ABI_VERSION);
