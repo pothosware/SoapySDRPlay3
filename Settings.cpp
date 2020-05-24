@@ -1373,16 +1373,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
 #ifdef RF_GAIN_IN_MENU
    if (key == "rfgain_sel")
    {
-      if      (value == "0") chParams->tunerParams.gain.LNAstate = 0;
-      else if (value == "1") chParams->tunerParams.gain.LNAstate = 1;
-      else if (value == "2") chParams->tunerParams.gain.LNAstate = 2;
-      else if (value == "3") chParams->tunerParams.gain.LNAstate = 3;
-      else if (value == "4") chParams->tunerParams.gain.LNAstate = 4;
-      else if (value == "5") chParams->tunerParams.gain.LNAstate = 5;
-      else if (value == "6") chParams->tunerParams.gain.LNAstate = 6;
-      else if (value == "7") chParams->tunerParams.gain.LNAstate = 7;
-      else if (value == "8") chParams->tunerParams.gain.LNAstate = 8;
-      else                   chParams->tunerParams.gain.LNAstate = 9;
+      chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(stoul(value));
       if (chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
       {
          sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
@@ -1560,16 +1551,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
 #ifdef RF_GAIN_IN_MENU
     if (key == "rfgain_sel")
     {
-       if      (chParams->tunerParams.gain.LNAstate == 0) return "0";
-       else if (chParams->tunerParams.gain.LNAstate == 1) return "1";
-       else if (chParams->tunerParams.gain.LNAstate == 2) return "2";
-       else if (chParams->tunerParams.gain.LNAstate == 3) return "3";
-       else if (chParams->tunerParams.gain.LNAstate == 4) return "4";
-       else if (chParams->tunerParams.gain.LNAstate == 5) return "5";
-       else if (chParams->tunerParams.gain.LNAstate == 6) return "6";
-       else if (chParams->tunerParams.gain.LNAstate == 7) return "7";
-       else if (chParams->tunerParams.gain.LNAstate == 8) return "8";
-       else                                               return "9";
+       return std::to_string(static_cast<unsigned int>(chParams->tunerParams.gain.LNAstate));
     }
     else
 #endif
