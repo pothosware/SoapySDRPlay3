@@ -1374,10 +1374,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    if (key == "rfgain_sel")
    {
       chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(stoul(value));
-      if (chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
-      {
-         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-      }
+      sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
    }
    else
 #endif
