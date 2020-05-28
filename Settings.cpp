@@ -622,7 +622,7 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
       //Depending of the previously used AGC context, the real applied 
       // gain may be either gRdB or current_gRdB, so apply the change if required value is different 
       //from one of them.
-      if ((chParams->tunerParams.gain.gRdB != (int)value) || ((int)chParams->tunerParams.gain.gainVals.curr != (int)value))
+      if (chParams->tunerParams.gain.gRdB != (int)value)
       {
          chParams->tunerParams.gain.gRdB = (int)value;
          doUpdate = true;
