@@ -32,13 +32,6 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     add_definitions(-Wno-unused-parameter)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
-# Configurable feature set
-SET (RF_GAIN_IN_MENU ON CACHE BOOL "Add Rf gain as a setting, additionally to the IFGR gain control")
-
-IF(RF_GAIN_IN_MENU)
-    ADD_DEFINITIONS( -DRF_GAIN_IN_MENU=1 )
-ENDIF()
-
 SET (STREAMING_USB_MODE_BULK OFF CACHE BOOL "Use USB bulk mode instead of isochronous")
 
 IF(STREAMING_USB_MODE_BULK)
