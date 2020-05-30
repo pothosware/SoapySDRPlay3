@@ -73,8 +73,8 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 
    if (activeStream)
    {
-      SoapySDR_log(SOAPY_SDR_WARNING, "findSDRPlay() called while the device is streaming. Deactivating stream.");
-      activeSoapySDRPlay->deactivateStream(activeStream, 0, 0LL);
+      SoapySDR_log(SOAPY_SDR_WARNING, "findSDRPlay() called while the device is streaming. Ignoring request.");
+      return results;
    }
 
    if (deviceSelected)
