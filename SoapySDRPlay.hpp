@@ -257,6 +257,7 @@ private:
     sdrplay_api_RxChannelParamsT *chParams;
     float ver;
     std::string hardwareKey;
+    bool rspDuoDualTunerIndependentRx;
 
     //cached settings
     double outputSampleRate;

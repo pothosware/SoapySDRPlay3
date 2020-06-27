@@ -59,9 +59,14 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
       }
    }
    bool isMasterAt8MhzHint = false;
+   bool isDualTunerIndependentRxHint = false;
    if (args.count("rspduo_sample_freq") != 0)
    {
       isMasterAt8MhzHint = args.at("rspduo_sample_freq") == "8";
+   }
+   if (args.count("rspduo_dual_tuner_independent_rx") != 0)
+   {
+      isDualTunerIndependentRxHint = args.at("rspduo_dual_tuner_independent_rx") == "true";
    }
 
    unsigned int nDevs = 0;
@@ -118,13 +123,16 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
          break;
       case SDRPLAY_RSPduo_ID:
          struct {
-            sdrplay_api_RspDuoModeT rspDuoMode; bool isMasterAt8Mhz;
+            sdrplay_api_RspDuoModeT rspDuoMode;
+            bool isMasterAt8Mhz;
+            bool isDualTunerIndependentRx;
          } modes[] = {
-            { sdrplay_api_RspDuoMode_Single_Tuner, false },
-            { sdrplay_api_RspDuoMode_Dual_Tuner, false },
-            { sdrplay_api_RspDuoMode_Master, false },
-            { sdrplay_api_RspDuoMode_Master, true },
-            { sdrplay_api_RspDuoMode_Slave, false }
+            { sdrplay_api_RspDuoMode_Single_Tuner, false, false },
+            { sdrplay_api_RspDuoMode_Dual_Tuner, false, false },
+            { sdrplay_api_RspDuoMode_Dual_Tuner, false, true },
+            { sdrplay_api_RspDuoMode_Master, false, false },
+            { sdrplay_api_RspDuoMode_Master, true, false },
+            { sdrplay_api_RspDuoMode_Slave, false, false }
          };
          for (auto mode : modes)
          {
@@ -134,21 +142,28 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
                    (rspDuoModeHint == sdrplay_api_RspDuoMode_Unknown ||
                     mode.rspDuoMode == rspDuoModeHint) &&
                    (mode.rspDuoMode != sdrplay_api_RspDuoMode_Master ||
-                    (!isMasterAt8MhzHint || mode.isMasterAt8Mhz)))
+                    (!isMasterAt8MhzHint || mode.isMasterAt8Mhz)) &&
+                   (mode.rspDuoMode != sdrplay_api_RspDuoMode_Dual_Tuner ||
+                    (!isDualTunerIndependentRxHint || mode.isDualTunerIndependentRx)))
                {
                   SoapySDR::Kwargs dev;
                   dev["driver"] = "sdrplay";
-                  sprintf_s(lblstr, 128, "%s%d %s %.*s - %s%s",
+                  sprintf_s(lblstr, 128, "%s%d %s %.*s - %s%s%s",
                             baseLabel.c_str(), devIdx,
                             SoapySDRPlay::HWVertoString(rspDevs[i].hwVer).c_str(),
                             SDRPLAY_MAX_SER_NO_LEN, rspDevs[i].SerNo,
                             SoapySDRPlay::RSPDuoModetoString(mode.rspDuoMode).c_str(),
-                            mode.rspDuoMode == sdrplay_api_RspDuoMode_Master && mode.isMasterAt8Mhz ? " (RSPduo sample rate=8Mhz)" : "");
+                            mode.rspDuoMode == sdrplay_api_RspDuoMode_Master && mode.isMasterAt8Mhz ? " (RSPduo sample rate=8Mhz)" : "",
+                            mode.rspDuoMode == sdrplay_api_RspDuoMode_Dual_Tuner ? (mode.isDualTunerIndependentRx ? " (independent RX)" : " (diversity reception)") : "");
                   dev["label"] = lblstr;
                   dev["rspduo_mode"] = std::to_string(mode.rspDuoMode);
                   if (mode.isMasterAt8Mhz)
                   {
                      dev["rspduo_sample_freq"] = "8";
+                  }
+                  if (mode.isDualTunerIndependentRx)
+                  {
+                     dev["rspduo_dual_tuner_independent_rx"] = "true";
                   }
                   results.push_back(dev);
                }
