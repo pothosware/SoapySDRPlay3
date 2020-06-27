@@ -711,16 +711,26 @@ void SoapySDRPlay::setFrequency(const int direction,
       if (name == "RF")
       {
          sdrplay_api_RxChannelParamsT *chp = chParams;
-         if (device.hwVer == SDRPLAY_RSPduo_ID && channel == 1 && rspDuoDualTunerIndependentRx)
+         sdrplay_api_TunerSelectT tun = device.tuner;
+         if (device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoMode == sdrplay_api_RspDuoMode_Dual_Tuner && rspDuoDualTunerIndependentRx)
          {
-            chp = deviceParams->rxChannelB;
+            if (channel == 0)
+            {
+               chp = deviceParams->rxChannelA;
+               tun = sdrplay_api_Tuner_A;
+            }
+            else if (channel == 1)
+            {
+               chp = deviceParams->rxChannelB;
+               tun = sdrplay_api_Tuner_B;
+            }
          }
          if (chp->tunerParams.rfFreq.rfHz != (uint32_t)frequency)
          {
             chp->tunerParams.rfFreq.rfHz = (uint32_t)frequency;
             if (streamActive)
             {
-               sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
+               sdrplay_api_Update(device.dev, tun, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
             }
          }
       }
@@ -743,11 +753,18 @@ double SoapySDRPlay::getFrequency(const int direction, const size_t channel, con
 
     if (name == "RF")
     {
-         sdrplay_api_RxChannelParamsT *chp = chParams;
-         if (device.hwVer == SDRPLAY_RSPduo_ID && channel == 1 && rspDuoDualTunerIndependentRx)
-         {
-            chp = deviceParams->rxChannelB;
-         }
+        sdrplay_api_RxChannelParamsT *chp = chParams;
+        if (device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoMode == sdrplay_api_RspDuoMode_Dual_Tuner && rspDuoDualTunerIndependentRx)
+        {
+           if (channel == 0)
+           {
+              chp = deviceParams->rxChannelA;
+           }
+           else if (channel == 1)
+           {
+              chp = deviceParams->rxChannelB;
+           }
+        }
         return (double)chp->tunerParams.rfFreq.rfHz;
     }
     else if (name == "CORR")
