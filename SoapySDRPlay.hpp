@@ -244,6 +244,10 @@ private:
 
     static sdrplay_api_Bw_MHzT sdrPlayGetBwMhzEnum(double bw);
 
+    sdrplay_api_RxChannelParamsT *getChParams(const size_t channel) const;
+
+    sdrplay_api_TunerSelectT getChTuner(const size_t channel) const;
+
     void releaseDevice();
 
     void selectDevice();
