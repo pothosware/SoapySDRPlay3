@@ -259,7 +259,6 @@ private:
     sdrplay_api_DeviceT device;
     sdrplay_api_DeviceParamsT *deviceParams;
     sdrplay_api_RxChannelParamsT *chParams;
-    float ver;
     std::string hardwareKey;
 
     //cached settings
@@ -323,8 +322,13 @@ public:
             static sdrplay_api instance;
             return instance;
         }
+        static float get_version()
+        {
+            return ver;
+        }
 
     private:
+        static float ver;
         sdrplay_api();
 
     public:

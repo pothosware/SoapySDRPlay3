@@ -24,6 +24,7 @@
 
 #include "SoapySDRPlay.hpp"
 
+float SoapySDRPlay::sdrplay_api::ver = 0.0;
 
 // Singleton class for SDRplay API (only one per process)
 SoapySDRPlay::sdrplay_api::sdrplay_api()
@@ -37,7 +38,6 @@ SoapySDRPlay::sdrplay_api::sdrplay_api()
     }
 
     // Check API versions match
-    float ver;
     err = sdrplay_api_ApiVersion(&ver);
     if (err != sdrplay_api_Success) {
         SoapySDR_logf(SOAPY_SDR_ERROR, "ApiVersion Error: %s", sdrplay_api_GetErrorString(err));

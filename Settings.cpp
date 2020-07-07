@@ -269,6 +269,7 @@ SoapySDR::Kwargs SoapySDRPlay::getHardwareInfo(void) const
     // this also gets printed in --probe
     SoapySDR::Kwargs hwArgs;
 
+    float ver = SoapySDRPlay::sdrplay_api::get_version();
     hwArgs["sdrplay_api_api_version"] = std::to_string(ver);
     hwArgs["sdrplay_api_hw_version"] = std::to_string(device.hwVer);
 
