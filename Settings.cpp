@@ -750,7 +750,12 @@ double SoapySDRPlay::getFrequency(const int direction, const size_t channel, con
     }
     else if (name == "CORR")
     {
-        return deviceParams->devParams->ppm;
+        if (deviceParams->devParams)
+        {
+            return deviceParams->devParams->ppm;
+        } else {
+            return 0;
+        }
     }
 
     return 0;
