@@ -101,6 +101,13 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq, unsigned int numSamples,
        stream->tail = (stream->tail + 1) % numBuffers;
        stream->count++;
 
+       auto &buff = stream->buffs[stream->tail];
+       if (stream->count == numBuffers && (size_t) spaceReqd > buff.capacity() - buff.size())
+       {
+           stream->overflowEvent = true;
+           return;
+       }
+
        // notify readStream()
        stream->cond.notify_one();
     }
