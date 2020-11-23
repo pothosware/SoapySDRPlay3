@@ -32,10 +32,10 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     add_definitions(-Wno-unused-parameter)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
-# Configurable feature set 
+# Configurable feature set
 SET (RF_GAIN_IN_MENU ON CACHE BOOL "Add Rf gain as a setting, additionally to the IFGR gain control")
 
-IF(RF_GAIN_IN_MENU) 
+IF(RF_GAIN_IN_MENU)
     ADD_DEFINITIONS( -DRF_GAIN_IN_MENU=1 )
 ENDIF()
 
