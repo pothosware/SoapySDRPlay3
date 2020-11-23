@@ -323,6 +323,11 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     cbFns.StreamBCbFn = _rx_callback_B;
     cbFns.EventCbFn = _ev_callback;
 
+#ifdef STREAMING_USB_MODE_BULK
+    SoapySDR_log(SOAPY_SDR_INFO, "Using streaming USB mode bulk.");
+    deviceParams->devParams->mode = sdrplay_api_BULK;
+#endif
+
     err = sdrplay_api_Init(device.dev, &cbFns, (void *)this);
     if (err != sdrplay_api_Success)
     {
