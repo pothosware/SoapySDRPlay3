@@ -787,26 +787,21 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "Setting output sample rate: %lf", output_sample_rate);
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "Requested output sample rate: %lf", output_sample_rate);
 
     if (direction == SOAPY_SDR_RX)
     {
-       // check output sample rate for the RSPduo case
-       if (output_sample_rate > 2000000 && device.hwVer == SDRPLAY_RSPduo_ID &&
-           (device.rspDuoMode == sdrplay_api_RspDuoMode_Dual_Tuner ||
-            device.rspDuoMode == sdrplay_api_RspDuoMode_Master ||
-            device.rspDuoMode == sdrplay_api_RspDuoMode_Slave)) {
-          SoapySDR_logf(SOAPY_SDR_WARNING, "invalid sample rate for RSPduo in master or slave mode. Using 2MHz instead.");
-          // cast away the constness of output_sample_rate to force its value
-          *(const_cast<double*>(&output_sample_rate)) = 2000000;
-       }
-
-       outputSampleRate = output_sample_rate;
-
        unsigned int decM;
        unsigned int decEnable;
        sdrplay_api_If_kHzT ifType;
        double input_sample_rate = getInputSampleRateAndDecimation(output_sample_rate, &decM, &decEnable, &ifType);
+       if (input_sample_rate < 0) {
+           SoapySDR_logf(SOAPY_SDR_WARNING, "invalid sample rate. Sample rate unchanged.");
+           return;
+       }
+
+       outputSampleRate = output_sample_rate;
+
        sdrplay_api_Bw_MHzT bwType = getBwEnumForRate(output_sample_rate);
 
        sdrplay_api_ReasonForUpdateT reasonForUpdate = sdrplay_api_Update_None;
@@ -861,54 +856,100 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 {
     std::vector<double> output_sample_rates;
 
-    output_sample_rates.push_back(62500);
-    output_sample_rates.push_back(125000);
-    output_sample_rates.push_back(250000);
-    output_sample_rates.push_back(500000);
-    output_sample_rates.push_back(1000000);
-    output_sample_rates.push_back(2000000);
-
-    if (device.hwVer != SDRPLAY_RSPduo_ID || device.rspDuoMode == sdrplay_api_RspDuoMode_Single_Tuner)
+    if (device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoMode != sdrplay_api_RspDuoMode_Single_Tuner)
     {
-        output_sample_rates.push_back(2048000);
-        output_sample_rates.push_back(3000000);
-        output_sample_rates.push_back(4000000);
-        output_sample_rates.push_back(5000000);
-        output_sample_rates.push_back(6000000);
-        output_sample_rates.push_back(7000000);
-        output_sample_rates.push_back(8000000);
-        output_sample_rates.push_back(9000000);
-        output_sample_rates.push_back(10000000);
+        output_sample_rates.push_back(62500);
+        output_sample_rates.push_back(125000);
+        output_sample_rates.push_back(250000);
+        output_sample_rates.push_back(500000);
+        output_sample_rates.push_back(1000000);
+        output_sample_rates.push_back(2000000);
+        return output_sample_rates;
     }
 
+    output_sample_rates.push_back(62500);
+    output_sample_rates.push_back(96000);
+    output_sample_rates.push_back(125000);
+    output_sample_rates.push_back(192000);
+    output_sample_rates.push_back(250000);
+    output_sample_rates.push_back(384000);
+    output_sample_rates.push_back(500000);
+    output_sample_rates.push_back(768000);
+    output_sample_rates.push_back(1000000);
+    output_sample_rates.push_back(2000000);
+    output_sample_rates.push_back(2048000);
+    output_sample_rates.push_back(3000000);
+    output_sample_rates.push_back(4000000);
+    output_sample_rates.push_back(5000000);
+    output_sample_rates.push_back(6000000);
+    output_sample_rates.push_back(7000000);
+    output_sample_rates.push_back(8000000);
+    output_sample_rates.push_back(9000000);
+    output_sample_rates.push_back(10000000);
     return output_sample_rates;
 }
 
 double SoapySDRPlay::getInputSampleRateAndDecimation(uint32_t output_sample_rate, unsigned int *decM, unsigned int *decEnable, sdrplay_api_If_kHzT *ifType) const
 {
+    sdrplay_api_If_kHzT lif = sdrplay_api_IF_1_620;
+    double lif_input_sample_rate = 6000000;
+    if (device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoSampleFreq == 8000000)
+    {
+        lif = sdrplay_api_IF_2_048;
+        lif_input_sample_rate = 8000000;
+    }
+
+    // all RSPs should support these sample rates
+    switch (output_sample_rate) {
+        case 62500:
+            *ifType = lif; *decM = 32; *decEnable = 1;
+            return lif_input_sample_rate;
+        case 125000:
+            *ifType = lif; *decM = 16; *decEnable = 1;
+            return lif_input_sample_rate;
+        case 250000:
+            *ifType = lif; *decM =  8; *decEnable = 1;
+            return lif_input_sample_rate;
+        case 500000:
+            *ifType = lif; *decM =  4; *decEnable = 1;
+            return lif_input_sample_rate;
+        case 1000000:
+            *ifType = lif; *decM =  2; *decEnable = 1;
+            return lif_input_sample_rate;
+        case 2000000:
+            *ifType = lif; *decM =  1; *decEnable = 0;
+            return lif_input_sample_rate;
+    }
+
+    if (device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoMode != sdrplay_api_RspDuoMode_Single_Tuner)
+    {
+        return -1;
+    }
+  
     if (output_sample_rate <= 2000000)
     {
-        if      (output_sample_rate ==   62500) { *decM = 32; *decEnable = 1; }
-        else if (output_sample_rate ==  125000) { *decM = 16; *decEnable = 1; }
-        else if (output_sample_rate ==  250000) { *decM =  8; *decEnable = 1; }
-        else if (output_sample_rate ==  500000) { *decM =  4; *decEnable = 1; }
-        else if (output_sample_rate == 1000000) { *decM =  2; *decEnable = 1; }
-        else                      { *decM =  1; *decEnable = 0; }
-        if (device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoSampleFreq == 8000000) {
-            *ifType = sdrplay_api_IF_2_048;
-            return 8000000;
-        } else {
-            *ifType = sdrplay_api_IF_1_620;
-            return 6000000;
+        switch (output_sample_rate) {
+            case 96000:
+                *ifType = sdrplay_api_IF_Zero; *decM = 32; *decEnable = 1;
+                return output_sample_rate * *decM;
+            case 192000:
+                *ifType = sdrplay_api_IF_Zero; *decM = 16; *decEnable = 1;
+                return output_sample_rate * *decM;
+            case 384000:
+                *ifType = sdrplay_api_IF_Zero; *decM =  8; *decEnable = 1;
+                return output_sample_rate * *decM;
+            case 768000:
+                *ifType = sdrplay_api_IF_Zero; *decM =  4; *decEnable = 1;
+                return output_sample_rate * *decM;
+            default:
+                return -1;
         }
     }
-    else
-    {
-        // rate should be > 2 MHz so just return output_sample_rate
-        *decM = 1; *decEnable = 0;
-        *ifType = sdrplay_api_IF_Zero;
-        return output_sample_rate;
-    }
+
+    // rate should be > 2 MHz so just return output_sample_rate
+    *decM = 1; *decEnable = 0;
+    *ifType = sdrplay_api_IF_Zero;
+    return output_sample_rate;
 }
 
 /*******************************************************************
