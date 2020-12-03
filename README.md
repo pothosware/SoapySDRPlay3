@@ -13,7 +13,7 @@
 
 This section contains some useful information for troubleshhoting
 
-### `[WARNING] Can't find label in args`
+##### Message: `[WARNING] Can't find label in args`
 
 An error message like this one:
 ```
@@ -22,7 +22,7 @@ Probe device driver=sdrplay
 Error probing device: Can't find label in args
 ```
 
-could be due to the OS not being able to 'see' the RSP as USB device.
+could be due to the OS not being able to 'see' the RSP as a USB device.
 
 You may want to check using the command `lsusb`:
 ```
