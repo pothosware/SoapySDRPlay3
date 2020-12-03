@@ -44,8 +44,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
     if (args.count("label") == 0)
     {
-        SoapySDR_log(SOAPY_SDR_WARNING, "Can't find label in args");
-        throw std::runtime_error("Can't find label in args");
+        SoapySDR_log(SOAPY_SDR_WARNING, "Can't find label in args - use 'lsusb' to make sure the OS can see the RSP");
+        throw std::runtime_error("Can't find label in args - use 'lsusb' to make sure the OS can see the RSP");
     }
 
     std::string label = args.at("label");
