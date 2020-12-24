@@ -231,6 +231,15 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
         chParams->rspDuoTunerParams.rfDabNotchEnable = 0;
     }
 
+    // process additional device string arguments
+    for (std::pair<std::string, std::string> arg : args) {
+        // ignore 'driver', 'label', and 'soapy'
+        if (arg.first == "driver" || arg.first == "label" || arg.first == "soapy") {
+            continue;
+        }
+        writeSetting(arg.first, arg.second);
+    }
+
     _streams[0] = 0;
     _streams[1] = 0;
     useShort = true;
@@ -1414,6 +1423,7 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value)
 {
    std::lock_guard <std::mutex> lock(_general_state_mutex);
+SoapySDR_logf(SOAPY_SDR_INFO, "DEBUG - writeSetting(key=%s, value=%s)", key.c_str(), value.c_str());
 
 #ifdef RF_GAIN_IN_MENU
    if (key == "rfgain_sel")
