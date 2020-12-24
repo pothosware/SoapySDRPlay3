@@ -489,9 +489,11 @@ SoapySDR_logf(SOAPY_SDR_INFO, "DEBUG - setAntenna(channel=%d, name=%s)", channel
             }
             else
             {
+                unsigned char biasTen = chParams->rspDuoTunerParams.biasTEnable;
                 releaseDevice();
                 device.tuner = device.tuner == sdrplay_api_Tuner_A ? sdrplay_api_Tuner_B : sdrplay_api_Tuner_A;
                 selectDevice();
+                chParams->rspDuoTunerParams.biasTEnable = biasTen;
             }
         }
     }
