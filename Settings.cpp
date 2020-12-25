@@ -356,7 +356,6 @@ std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const s
 
 void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const std::string &name)
 {
-SoapySDR_logf(SOAPY_SDR_INFO, "DEBUG - setAntenna(channel=%d, name=%s)", channel, name.c_str());
     // Check direction
     if ((direction != SOAPY_SDR_RX) || (device.hwVer == SDRPLAY_RSP1_ID) || (device.hwVer == SDRPLAY_RSP1A_ID)) {
         return;       
@@ -1427,7 +1426,6 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value)
 {
    std::lock_guard <std::mutex> lock(_general_state_mutex);
-SoapySDR_logf(SOAPY_SDR_INFO, "DEBUG - writeSetting(key=%s, value=%s)", key.c_str(), value.c_str());
 
 #ifdef RF_GAIN_IN_MENU
    if (key == "rfgain_sel")
@@ -1496,7 +1494,6 @@ SoapySDR_logf(SOAPY_SDR_INFO, "DEBUG - writeSetting(key=%s, value=%s)", key.c_st
       }
       else if (device.hwVer == SDRPLAY_RSPduo_ID)
       {
-SoapySDR_logf(SOAPY_SDR_INFO, "DEBUG - biasT - device.tuner=%d isRxChannelA=%d isRxChannelB=%d", device.tuner, chParams == deviceParams->rxChannelA, chParams == deviceParams->rxChannelB);
          chParams->rspDuoTunerParams.biasTEnable = biasTen;
          if (streamActive)
          {
