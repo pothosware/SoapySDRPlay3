@@ -231,6 +231,15 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
         chParams->rspDuoTunerParams.rfDabNotchEnable = 0;
     }
 
+    // process additional device string arguments
+    for (std::pair<std::string, std::string> arg : args) {
+        // ignore 'driver', 'label', and 'soapy'
+        if (arg.first == "driver" || arg.first == "label" || arg.first == "soapy") {
+            continue;
+        }
+        writeSetting(arg.first, arg.second);
+    }
+
     _streams[0] = 0;
     _streams[1] = 0;
     useShort = true;
@@ -479,9 +488,12 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
             }
             else
             {
+                // preserve biasT setting when changing tuner/antenna
+                unsigned char biasTen = chParams->rspDuoTunerParams.biasTEnable;
                 releaseDevice();
                 device.tuner = device.tuner == sdrplay_api_Tuner_A ? sdrplay_api_Tuner_B : sdrplay_api_Tuner_A;
                 selectDevice();
+                chParams->rspDuoTunerParams.biasTEnable = biasTen;
             }
         }
     }
