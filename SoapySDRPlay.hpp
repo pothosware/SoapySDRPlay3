@@ -36,12 +36,15 @@
 #include <string>
 #include <cstring>
 #include <algorithm>
+#include <set>
 
 #include <sdrplay_api.h>
 
 #define DEFAULT_BUFFER_LENGTH     (65536)
 #define DEFAULT_NUM_BUFFERS       (8)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
+
+std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
 
 class SoapySDRPlay: public SoapySDR::Device
 {
@@ -255,7 +258,8 @@ private:
     sdrplay_api_DeviceT device;
     sdrplay_api_DeviceParamsT *deviceParams;
     sdrplay_api_RxChannelParamsT *chParams;
-    std::string hardwareKey;
+    int hwVer;
+    std::string serNo;
 
     //cached settings
     double outputSampleRate;

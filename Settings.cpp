@@ -32,149 +32,76 @@
 #include <strings.h>
 #endif
 
+std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
+{
+   static std::set<std::string> serials;
+   return serials;
+}
 
-// globals declared in Registration.cpp
-extern sdrplay_api_DeviceT *deviceSelected;
-extern SoapySDR::Stream *activeStream;
-extern SoapySDRPlay *activeSoapySDRPlay;
 
-static sdrplay_api_DeviceT rspDevs[SDRPLAY_MAX_DEVICES];
+sdrplay_api_DeviceT *deviceSelected = nullptr;
+SoapySDR::Stream *activeStream = nullptr;
+SoapySDRPlay *activeSoapySDRPlay = nullptr;
+
 
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
-    if (args.count("label") == 0)
-    {
-        SoapySDR_log(SOAPY_SDR_WARNING, "Can't find label in args - use 'lsusb' to make sure the OS can see the RSP");
-        throw std::runtime_error("Can't find label in args - use 'lsusb' to make sure the OS can see the RSP");
-    }
+    if (args.count("serial") == 0) throw std::runtime_error("no sdrplay device found");
 
-    std::string label = args.at("label");
-
-    std::string baseLabel = "SDRplay Dev";
-
-    size_t posidx = label.find(baseLabel);
-
-    if (posidx == std::string::npos)
-    {
-        SoapySDR_log(SOAPY_SDR_WARNING, "Can't find Dev string in args");
-        throw std::runtime_error("Can't find Dev string in args");
-    }
-    // retrieve device index
-    unsigned int devIdx = label.at(posidx + baseLabel.length()) - 0x30;
-
-    SoapySDR_logf(SOAPY_SDR_INFO, "devIdx: %d", devIdx);
+    serNo = args.at("serial");
 
     // retrieve hwVer and serNo by API
     unsigned int nDevs = 0;
 
-    bool deviceFound = false;
-
     sdrplay_api_LockDeviceApi();
+    sdrplay_api_DeviceT rspDevs[SDRPLAY_MAX_DEVICES];
     sdrplay_api_GetDevices(&rspDevs[0], &nDevs, SDRPLAY_MAX_DEVICES);
-    unsigned int idx = 0;
-    for (unsigned int i = 0; i < nDevs; ++i)
+
+    unsigned devIdx = SDRPLAY_MAX_DEVICES;
+    for (unsigned int i = 0; i < nDevs; i++)
     {
-        switch (rspDevs[i].hwVer)
-        {
-        case SDRPLAY_RSP1_ID:
-        case SDRPLAY_RSP1A_ID:
-        case SDRPLAY_RSP2_ID:
-        case SDRPLAY_RSPdx_ID:
-            if (idx == devIdx)
-            {
-                deviceFound = true;
-                device = rspDevs[i];
-                hardwareKey = device.SerNo;
-            }
-            ++idx;
-            break;
-        case SDRPLAY_RSPduo_ID:
-            struct {
-                sdrplay_api_RspDuoModeT rspDuoMode; bool isMasterAt8Mhz;
-            } modes[] = {
-                { sdrplay_api_RspDuoMode_Single_Tuner, false },
-                { sdrplay_api_RspDuoMode_Dual_Tuner, false },
-                { sdrplay_api_RspDuoMode_Master, false },
-                { sdrplay_api_RspDuoMode_Master, true },
-                { sdrplay_api_RspDuoMode_Slave, false }
-            };
-            for (auto mode : modes)
-            {
-                if (rspDevs[i].rspDuoMode & mode.rspDuoMode)
-                {
-                    if (idx == devIdx)
-                    {
-                        deviceFound = true;
-                        device = rspDevs[i];
-                        hardwareKey = device.SerNo;
-                        device.rspDuoMode = mode.rspDuoMode;
-                        if (mode.rspDuoMode == sdrplay_api_RspDuoMode_Single_Tuner)
-                        {
-                            hardwareKey += " - Single Tuner";
-                            //device.rspDuoSampleFreq = defaultRspDuoSampleFreq;
-                            device.rspDuoSampleFreq = 0.0;
-                        }
-                        else if (mode.rspDuoMode == sdrplay_api_RspDuoMode_Dual_Tuner)
-                        {
-                            hardwareKey += " - Dual Tuner";
-                            device.rspDuoSampleFreq = defaultRspDuoSampleFreq;
-                        }
-                        else if (mode.rspDuoMode == sdrplay_api_RspDuoMode_Master)
-                        {
-                            hardwareKey += " - Master";
-                            device.rspDuoSampleFreq = mode.isMasterAt8Mhz ? 8000000 : defaultRspDuoSampleFreq;
-                            hardwareKey += mode.isMasterAt8Mhz ? " (RSPduo sample rate=8Mhz)" : "";
-                        }
-                        else if (mode.rspDuoMode == sdrplay_api_RspDuoMode_Slave)
-                        {
-                            hardwareKey += " - Slave";
-                        }
-                        break;
-                    }
-                    ++idx;
-                }
-            }
-            break;
-        }
-        if (deviceFound)
-        {
-            break;
-        }
+        if (rspDevs[i].SerNo == serNo) devIdx = i;
     }
+    if (devIdx == SDRPLAY_MAX_DEVICES) throw std::runtime_error("no sdrplay device matches");
 
-    if (!deviceFound) {
-        SoapySDR_logf(SOAPY_SDR_WARNING, "Can't determine hwVer/serNo");
-        throw std::runtime_error("Can't determine hwVer/serNo");
-    }
+    device = rspDevs[devIdx];
+    hwVer = device.hwVer;
 
-    SoapySDR_logf(SOAPY_SDR_INFO, "hwVer: %d", device.hwVer);
-
-    if (device.hwVer == SDRPLAY_RSPduo_ID) {
-        // set default tuner (in 'Single Tuner' and 'Master' mode, choose
-        // 'Tuner A' in case both tuners are available
-        switch (device.rspDuoMode) {
-            case sdrplay_api_RspDuoMode_Unknown:
-                throw std::runtime_error("Unexpected rspDuoMode: sdrplay_api_RspDuoMode_Unknown");
-            case sdrplay_api_RspDuoMode_Single_Tuner:
-                device.tuner = device.tuner == sdrplay_api_Tuner_Both ?
-                               sdrplay_api_Tuner_A : device.tuner;
-                break;
-            case sdrplay_api_RspDuoMode_Dual_Tuner:
-                outputSampleRate = defaultRspDuoOutputSampleRate;
-                break;
-            case sdrplay_api_RspDuoMode_Master:
-                device.tuner = device.tuner == sdrplay_api_Tuner_Both ?
-                               sdrplay_api_Tuner_A : device.tuner;
-                outputSampleRate = defaultRspDuoOutputSampleRate;
-                break;
-            case sdrplay_api_RspDuoMode_Slave:
-                // set the output sampling rate in slave mode
-                outputSampleRate = defaultRspDuoOutputSampleRate;
-                break;
+    if (hwVer == SDRPLAY_RSPduo_ID)
+    {
+        if (args.count("mode") == 0) throw std::runtime_error("sdrplay RSPduo mode not found");
+        std::string mode = args.at("mode");
+        // in 'Single Tuner' and 'Master' mode, choose 'Tuner A' in case both tuners are available
+        if (mode == "ST" && device.rspDuoMode & sdrplay_api_RspDuoMode_Single_Tuner)
+        {
+            device.rspDuoMode = sdrplay_api_RspDuoMode_Single_Tuner;
+            if (device.tuner == sdrplay_api_Tuner_Both) device.tuner = sdrplay_api_Tuner_A;
         }
-        SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoMode: %d", device.rspDuoMode);
-        SoapySDR_logf(SOAPY_SDR_INFO, "tuner: %d", device.tuner);
-        SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoSampleFreq: %lf", device.rspDuoSampleFreq);
+        else if (mode == "DT" && device.rspDuoMode & sdrplay_api_RspDuoMode_Dual_Tuner)
+        {
+            device.rspDuoMode = sdrplay_api_RspDuoMode_Dual_Tuner;
+            device.rspDuoSampleFreq = 6000000;
+        }
+        else if (mode == "MA" && device.rspDuoMode & sdrplay_api_RspDuoMode_Master)
+        {
+            device.rspDuoMode = sdrplay_api_RspDuoMode_Master;
+            device.rspDuoSampleFreq = 6000000;
+            if (device.tuner == sdrplay_api_Tuner_Both) device.tuner = sdrplay_api_Tuner_A;
+        }
+        else if (mode == "MA8" && device.rspDuoMode & sdrplay_api_RspDuoMode_Master)
+        {
+            device.rspDuoMode = sdrplay_api_RspDuoMode_Master;
+            device.rspDuoSampleFreq = 8000000;
+            if (device.tuner == sdrplay_api_Tuner_Both) device.tuner = sdrplay_api_Tuner_A;
+        }
+        else if (mode == "SL" && device.rspDuoMode & sdrplay_api_RspDuoMode_Slave)
+        {
+            device.rspDuoMode = sdrplay_api_RspDuoMode_Slave;
+        }
+        else
+        {
+            throw std::runtime_error("sdrplay RSPduo mode is invalid");
+        }
     }
 
     selectDevice();
@@ -233,8 +160,10 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
     // process additional device string arguments
     for (std::pair<std::string, std::string> arg : args) {
-        // ignore 'driver', 'label', and 'soapy'
-        if (arg.first == "driver" || arg.first == "label" || arg.first == "soapy") {
+        // ignore 'driver', 'label', 'mode', 'serial', and 'soapy'
+        if (arg.first == "driver" || arg.first == "label" ||
+            arg.first == "mode" || arg.first == "serial" ||
+            arg.first == "soapy") {
             continue;
         }
         writeSetting(arg.first, arg.second);
@@ -245,10 +174,12 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     useShort = true;
 
     streamActive = false;
+    SoapySDRPlay_getClaimedSerials().insert(serNo);
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
 {
+    SoapySDRPlay_getClaimedSerials().erase(serNo);
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
     releaseDevice();
@@ -269,7 +200,12 @@ std::string SoapySDRPlay::getDriverKey(void) const
 
 std::string SoapySDRPlay::getHardwareKey(void) const
 {
-    return hardwareKey;
+    if (hwVer == SDRPLAY_RSP1_ID) return "RSP1";
+    if (hwVer == SDRPLAY_RSP1A_ID) return "RSP1A";
+    if (hwVer == SDRPLAY_RSP2_ID) return "RSP2";
+    if (hwVer == SDRPLAY_RSPduo_ID) return "RSPduo";
+    if (hwVer == SDRPLAY_RSPdx_ID) return "RSPdx";
+    return "UNKNOWN";
 }
 
 SoapySDR::Kwargs SoapySDRPlay::getHardwareInfo(void) const
