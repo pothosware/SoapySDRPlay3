@@ -88,37 +88,57 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Single_Tuner)
       {
          dev["mode"] = "ST";
-         sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Single Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
-         dev["label"] = lblstr;
-         results.push_back(dev);
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Single Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+         }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Dual_Tuner)
       {
          dev["mode"] = "DT";
-         sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Dual Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
-         dev["label"] = lblstr;
-         results.push_back(dev);
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Dual Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+         }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Master)
       {
          dev["mode"] = "MA";
-         sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Master", results.size(), modelName.c_str(), rspDevs[i].SerNo);
-         dev["label"] = lblstr;
-         results.push_back(dev);
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Master", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+         }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Master)
       {
          dev["mode"] = "MA8";
-         sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Master (RSPduo sample rate=8Mhz)", results.size(), modelName.c_str(), rspDevs[i].SerNo);
-         dev["label"] = lblstr;
-         results.push_back(dev);
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Master (RSPduo sample rate=8Mhz)", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+         }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Slave)
       {
          dev["mode"] = "SL";
-         sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Slave", results.size(), modelName.c_str(), rspDevs[i].SerNo);
-         dev["label"] = lblstr;
-         results.push_back(dev);
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Slave", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+         }
       }
       _cachedResults[rspDevs[i].SerNo] = dev;
    }
