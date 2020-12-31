@@ -67,6 +67,9 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     device = rspDevs[devIdx];
     hwVer = device.hwVer;
 
+    SoapySDR_logf(SOAPY_SDR_INFO, "devIdx: %d", devIdx);
+    SoapySDR_logf(SOAPY_SDR_INFO, "hwVer: %d", device.hwVer);
+
     if (hwVer == SDRPLAY_RSPduo_ID)
     {
         if (args.count("mode") == 0) throw std::runtime_error("sdrplay RSPduo mode not found");
@@ -102,6 +105,11 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
         {
             throw std::runtime_error("sdrplay RSPduo mode is invalid");
         }
+        outputSampleRate = defaultRspDuoOutputSampleRate;
+
+        SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoMode: %d", device.rspDuoMode);
+        SoapySDR_logf(SOAPY_SDR_INFO, "tuner: %d", device.tuner);
+        SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoSampleFreq: %lf", device.rspDuoSampleFreq);
     }
 
     selectDevice();

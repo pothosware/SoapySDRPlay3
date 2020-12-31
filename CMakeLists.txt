@@ -46,7 +46,7 @@ IF(STREAMING_USB_MODE_BULK)
 ENDIF()
 
 SOAPY_SDR_MODULE_UTIL(
-    TARGET sdrPlay3Support
+    TARGET sdrPlaySupport
     SOURCES
         SoapySDRPlay.hpp
         Registration.cpp
@@ -59,5 +59,5 @@ SOAPY_SDR_MODULE_UTIL(
 
 # gcc 10+ on Linux needs -pthread for pthread_cond_clockwait()
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 10)
-    target_link_options(sdrPlay3Support PRIVATE -pthread)
+    target_link_options(sdrPlaySupport PRIVATE -pthread)
 endif ()
