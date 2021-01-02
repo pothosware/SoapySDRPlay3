@@ -70,6 +70,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     SoapySDR_logf(SOAPY_SDR_INFO, "devIdx: %d", devIdx);
     SoapySDR_logf(SOAPY_SDR_INFO, "hwVer: %d", device.hwVer);
 
+    outputSampleRate = 0.0;
+
     if (hwVer == SDRPLAY_RSPduo_ID)
     {
         if (args.count("mode") == 0) throw std::runtime_error("sdrplay RSPduo mode not found");
@@ -84,28 +86,31 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
         {
             device.rspDuoMode = sdrplay_api_RspDuoMode_Dual_Tuner;
             device.rspDuoSampleFreq = 6000000;
+            outputSampleRate = defaultRspDuoOutputSampleRate;
         }
         else if (mode == "MA" && device.rspDuoMode & sdrplay_api_RspDuoMode_Master)
         {
             device.rspDuoMode = sdrplay_api_RspDuoMode_Master;
             device.rspDuoSampleFreq = 6000000;
             if (device.tuner == sdrplay_api_Tuner_Both) device.tuner = sdrplay_api_Tuner_A;
+            outputSampleRate = defaultRspDuoOutputSampleRate;
         }
         else if (mode == "MA8" && device.rspDuoMode & sdrplay_api_RspDuoMode_Master)
         {
             device.rspDuoMode = sdrplay_api_RspDuoMode_Master;
             device.rspDuoSampleFreq = 8000000;
             if (device.tuner == sdrplay_api_Tuner_Both) device.tuner = sdrplay_api_Tuner_A;
+            outputSampleRate = defaultRspDuoOutputSampleRate;
         }
         else if (mode == "SL" && device.rspDuoMode & sdrplay_api_RspDuoMode_Slave)
         {
             device.rspDuoMode = sdrplay_api_RspDuoMode_Slave;
+            outputSampleRate = defaultRspDuoOutputSampleRate;
         }
         else
         {
             throw std::runtime_error("sdrplay RSPduo mode is invalid");
         }
-        outputSampleRate = defaultRspDuoOutputSampleRate;
 
         SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoMode: %d", device.rspDuoMode);
         SoapySDR_logf(SOAPY_SDR_INFO, "tuner: %d", device.tuner);
