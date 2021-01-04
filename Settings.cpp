@@ -646,69 +646,83 @@ static int getMaxRFGR(unsigned char hwVer)
    }
 }
 
+// There are 29 default gain settings, ranging from 0 to 28, which select a
+// pre-determined optimum balance between LNA attenuation and IF attenuation.
+// Larger values represent less attenuation (i.e. more gain), but note that
+// this value is *not* in decibels.
+#define NUM_DEFAULT_GAIN_SETTINGS 29
+
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
 {
    std::lock_guard <std::mutex> lock(_general_state_mutex);
    bool doUpdate = false;
 
-   const uint8_t rsp1_lnastates[] = { 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1,
-       2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rsp1_ifgains[] = { 59, 56, 53, 50, 47, 44, 41, 58, 55, 52, 49,
-       46, 43, 45, 42, 58, 55, 52, 49, 46, 43, 41, 38, 35, 32, 29, 26, 23, 20 };
-   const uint8_t rsp1a_lnastates[] = { 9, 9, 9, 9, 9, 9, 8, 7, 7, 7, 7, 7, 6,
-       6, 5, 5, 4, 3, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rsp1a_ifgains[] = { 59, 55, 52, 48, 45, 41, 42, 58, 54, 51, 47,
-       43, 46, 42, 44, 41, 43, 42, 44, 40, 43, 45, 42, 38, 34, 31, 27, 24, 20 };
-   const uint8_t rsp2_lnastates[] = { 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 6, 5, 5,
-       4, 4, 4, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rsp2_ifgains[] = { 59, 55, 52, 48, 44, 41, 56, 52, 49, 45, 41,
-       44, 45, 41, 48, 44, 40, 45, 42, 43, 49, 46, 42, 38, 35, 31, 27, 24, 20 };
-   const uint8_t rspduo_lnastates[] = { 9, 9, 9, 9, 9, 9, 8, 7, 7, 7, 7, 7, 6,
-       6, 5, 5, 4, 3, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rspduo_ifgains[] = { 59, 55, 52, 48, 45, 41, 42, 58, 54, 51,
-       47, 43, 46, 42, 44, 41, 43, 42, 44, 40, 43, 45, 42, 38, 34, 31, 27, 24,
-       20 };
-   const uint8_t rspdx_lnastates[] = { 26, 26, 26, 26, 26, 25, 23, 22, 20, 19,
-       17, 16, 14, 13, 11, 10, 8, 7, 5, 5, 5, 3, 2, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rspdx_ifgains[] = { 59, 55, 50, 46, 41, 40, 42, 40, 42, 40, 42,
-       41, 42, 41, 43, 41, 43, 41, 49, 45, 40, 42, 40, 42, 38, 33, 29, 24, 20 };
+   const uint8_t rsp1_lnastates[NUM_DEFAULT_GAIN_SETTINGS] = {
+      3,  3,  3,  3,  3,  3,  3,  1,  1,  1,  1,  1,  1,  2,  2,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
+   };
+   const uint8_t rsp1_ifgains[NUM_DEFAULT_GAIN_SETTINGS] = {
+     59, 56, 53, 50, 47, 44, 41, 58, 55, 52, 49, 46, 43, 45, 42,
+     58, 55, 52, 49, 46, 43, 41, 38, 35, 32, 29, 26, 23, 20
+   };
+   const uint8_t rsp1a_lnastates[NUM_DEFAULT_GAIN_SETTINGS] = {
+      9,  9,  9,  9,  9,  9,  8,  7,  7,  7,  7,  7,  6,  6,  5,
+      5,  4,  3,  2,  2,  1,  0,  0,  0,  0,  0,  0,  0,  0
+   };
+   const uint8_t rsp1a_ifgains[NUM_DEFAULT_GAIN_SETTINGS] = {
+     59, 55, 52, 48, 45, 41, 42, 58, 54, 51, 47, 43, 46, 42, 44,
+     41, 43, 42, 44, 40, 43, 45, 42, 38, 34, 31, 27, 24, 20
+   };
+   const uint8_t rsp2_lnastates[NUM_DEFAULT_GAIN_SETTINGS] = {
+      8,  8,  8,  8,  8,  8,  7,  7,  7,  7,  7,  6,  5,  5,  4,
+      4,  4,  2,  2,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0
+   };
+   const uint8_t rsp2_ifgains[NUM_DEFAULT_GAIN_SETTINGS] = {
+     59, 55, 52, 48, 44, 41, 56, 52, 49, 45, 41, 44, 45, 41, 48,
+     44, 40, 45, 42, 43, 49, 46, 42, 38, 35, 31, 27, 24, 20
+   };
+   const uint8_t rspduo_lnastates[NUM_DEFAULT_GAIN_SETTINGS] = {
+      9,  9,  9,  9,  9,  9,  8,  7,  7,  7,  7,  7,  6,  6,  5,
+      5,  4,  3,  2,  2,  1,  0,  0,  0,  0,  0,  0,  0,  0
+   };
+   const uint8_t rspduo_ifgains[NUM_DEFAULT_GAIN_SETTINGS] = {
+     59, 55, 52, 48, 45, 41, 42, 58, 54, 51, 47, 43, 46, 42, 44,
+     41, 43, 42, 44, 40, 43, 45, 42, 38, 34, 31, 27, 24, 20
+   };
+   const uint8_t rspdx_lnastates[NUM_DEFAULT_GAIN_SETTINGS] = {
+     26, 26, 26, 26, 26, 25, 23, 22, 20, 19, 17, 16, 14, 13, 11,
+     10,  8,  7,  5,  5,  5,  3,  2,  0,  0,  0,  0,  0,  0
+   };
+   const uint8_t rspdx_ifgains[NUM_DEFAULT_GAIN_SETTINGS] = {
+     59, 55, 50, 46, 41, 40, 42, 40, 42, 40, 42, 41, 42, 41, 43,
+     41, 43, 41, 49, 45, 40, 42, 40, 42, 38, 33, 29, 24, 20
+   };
 
-   int gain = std::max(0, (int)value);
-   int max_gain;
+   int index = std::max(0, std::min(NUM_DEFAULT_GAIN_SETTINGS - 1, (int)value));
    int rfGR = 0;
    int ifGR = 0;
 
    switch(device.hwVer)
    {
       case SDRPLAY_RSP1_ID:
-         max_gain = sizeof(rsp1_lnastates) / sizeof(rsp1_lnastates[0]) - 1;
-         rfGR = rsp1_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rsp1_ifgains) / sizeof(rsp1_ifgains[0]) - 1;
-         ifGR = rsp1_ifgains[std::min(gain, max_gain)];
+         rfGR = rsp1_lnastates[index];
+         ifGR = rsp1_ifgains[index];
          break;
       case SDRPLAY_RSP1A_ID:
-         max_gain = sizeof(rsp1a_lnastates) / sizeof(rsp1a_lnastates[0]) - 1;
-         rfGR = rsp1a_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rsp1a_ifgains) / sizeof(rsp1a_ifgains[0]) - 1;
-         ifGR = rsp1a_ifgains[std::min(gain, max_gain)];
+         rfGR = rsp1a_lnastates[index];
+         ifGR = rsp1a_ifgains[index];
          break;
       case SDRPLAY_RSP2_ID:
-         max_gain = sizeof(rsp2_lnastates) / sizeof(rsp2_lnastates[0]) - 1;
-         rfGR = rsp2_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rsp2_ifgains) / sizeof(rsp2_ifgains[0]) - 1;
-         ifGR = rsp2_ifgains[std::min(gain, max_gain)];
+         rfGR = rsp2_lnastates[index];
+         ifGR = rsp2_ifgains[index];
          break;
       case SDRPLAY_RSPduo_ID:
-         max_gain = sizeof(rspduo_lnastates) / sizeof(rspduo_lnastates[0]) - 1;
-         rfGR = rspduo_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rspduo_ifgains) / sizeof(rspduo_ifgains[0]) - 1;
-         ifGR = rspduo_ifgains[std::min(gain, max_gain)];
+         rfGR = rspduo_lnastates[index];
+         ifGR = rspduo_ifgains[index];
          break;
       case SDRPLAY_RSPdx_ID:
-         max_gain = sizeof(rspdx_lnastates) / sizeof(rspdx_lnastates[0]) - 1;
-         rfGR = rspdx_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rspdx_ifgains) / sizeof(rspdx_ifgains[0]) - 1;
-         ifGR = rspdx_ifgains[std::min(gain, max_gain)];
+         rfGR = rspdx_lnastates[index];
+         ifGR = rspdx_ifgains[index];
          break;
    }
 
@@ -729,6 +743,11 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const doub
       sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr,
                          sdrplay_api_Update_Ext1_None);
    }
+}
+
+SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
+{
+   return NUM_DEFAULT_GAIN_SETTINGS;
 }
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
