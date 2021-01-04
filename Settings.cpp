@@ -747,7 +747,7 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
    if (name == "IF" || name == "IFGR")
    {
-      int ifGR = (name == "IF") ? 20 + (59 - value) : value;
+      int ifGR = (name == "IF") ? -value : value;
       if (chParams->tunerParams.gain.gRdB != ifGR)
       {
          chParams->tunerParams.gain.gRdB = ifGR;
@@ -756,7 +756,7 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    }
    else if (name == "RF" || name == "RFGR")
    {
-      int rfGR = (name == "RF") ? getMaxRFGR(device.hwVer) - value : value;
+      int rfGR = (name == "RF") ? -value : value;
       if (chParams->tunerParams.gain.LNAstate != rfGR) {
 
           chParams->tunerParams.gain.LNAstate = rfGR;
@@ -781,7 +781,7 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
    }
    else if (name == "IF")
    {
-       return 20 + (59 - chParams->tunerParams.gain.gRdB);
+      return -(chParams->tunerParams.gain.gRdB);
    }
    else if (name == "RFGR")
    {
@@ -789,7 +789,7 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
    }
    else if (name == "RF")
    {
-      return getMaxRFGR(device.hwVer) - chParams->tunerParams.gain.LNAstate;
+      return -(chParams->tunerParams.gain.LNAstate);
    }
 
    return 0;
@@ -797,15 +797,22 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
 {
-   if (name == "IFGR" || name == "IF")
+   if (name == "IFGR")
    {
       return SoapySDR::Range(20, 59);
    }
-   else if (name == "RFGR" || name == "RF")
+   else if (name == "IF")
+   {
+      return SoapySDR::Range(-59, -20);
+   }
+   else if (name == "RFGR")
    {
       return SoapySDR::Range(0, getMaxRFGR(device.hwVer));
    }
-   return SoapySDR::Range(20, 59);
+   else  // name == "RF"
+   {
+      return SoapySDR::Range(-getMaxRFGR(device.hwVer), 0);
+   }
 }
 
 /*******************************************************************
