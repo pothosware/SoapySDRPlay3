@@ -260,6 +260,7 @@ private:
     sdrplay_api_RxChannelParamsT *chParams;
     int hwVer;
     std::string serNo;
+    std::string cacheKey;
 
     //cached settings
     double outputSampleRate;

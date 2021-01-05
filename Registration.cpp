@@ -79,7 +79,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
          sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s", results.size(), modelName.c_str(), rspDevs[i].SerNo);
          dev["label"] = lblstr;
          results.push_back(dev);
-         _cachedResults[rspDevs[i].SerNo] = dev;
+         _cachedResults[dev["serial"]] = dev;
          continue;
       }
 
@@ -94,6 +94,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
             sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Single Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
             dev["label"] = lblstr;
             results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
          }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Dual_Tuner)
@@ -105,6 +106,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
             sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Dual Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
             dev["label"] = lblstr;
             results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
          }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Master)
@@ -116,6 +118,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
             sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Master", results.size(), modelName.c_str(), rspDevs[i].SerNo);
             dev["label"] = lblstr;
             results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
          }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Master)
@@ -127,6 +130,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
             sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Master (RSPduo sample rate=8Mhz)", results.size(), modelName.c_str(), rspDevs[i].SerNo);
             dev["label"] = lblstr;
             results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
          }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Slave)
@@ -138,9 +142,9 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
             sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Slave", results.size(), modelName.c_str(), rspDevs[i].SerNo);
             dev["label"] = lblstr;
             results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
          }
       }
-      _cachedResults[rspDevs[i].SerNo] = dev;
    }
 
    sdrplay_api_UnlockDeviceApi();
@@ -149,7 +153,12 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
    for (const auto &serial : SoapySDRPlay_getClaimedSerials())
    {
       if (_cachedResults.count(serial) == 0) continue;
-      if (args.count("serial") != 0 and args.at("serial") != serial) continue;
+      if (args.count("serial") != 0)
+      {
+         std::string cacheKey = args.at("serial");
+         if (args.count("mode") != 0) cacheKey += "@" + args.at("mode");
+         if (cacheKey != serial) continue;
+      }
       results.push_back(_cachedResults.at(serial));
    }
 

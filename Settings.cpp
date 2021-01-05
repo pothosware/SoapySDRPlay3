@@ -187,12 +187,14 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     useShort = true;
 
     streamActive = false;
-    SoapySDRPlay_getClaimedSerials().insert(serNo);
+    cacheKey = serNo;
+    if (hwVer == SDRPLAY_RSPduo_ID) cacheKey += "@" + args.at("mode");
+    SoapySDRPlay_getClaimedSerials().insert(cacheKey);
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
 {
-    SoapySDRPlay_getClaimedSerials().erase(serNo);
+    SoapySDRPlay_getClaimedSerials().erase(cacheKey);
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
     releaseDevice();
