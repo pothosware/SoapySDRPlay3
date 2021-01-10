@@ -255,6 +255,7 @@ private:
      * Private variables
      ******************************************************************/
     //device settings
+    bool isSelected;
     sdrplay_api_DeviceT device;
     sdrplay_api_DeviceParamsT *deviceParams;
     sdrplay_api_RxChannelParamsT *chParams;
@@ -310,6 +311,7 @@ public:
     };
 
     SoapySDRPlayStream *_streams[2];
+    int _streamsRefCount[2];
 
     constexpr static double defaultRspDuoSampleFreq = 6000000;
     constexpr static double defaultRspDuoOutputSampleRate = 2000000;

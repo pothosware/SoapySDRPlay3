@@ -38,12 +38,6 @@ std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
    return serials;
 }
 
-
-sdrplay_api_DeviceT *deviceSelected = nullptr;
-SoapySDR::Stream *activeStream = nullptr;
-SoapySDRPlay *activeSoapySDRPlay = nullptr;
-
-
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
     if (args.count("serial") == 0) throw std::runtime_error("no sdrplay device found");
@@ -64,6 +58,7 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     }
     if (devIdx == SDRPLAY_MAX_DEVICES) throw std::runtime_error("no sdrplay device matches");
 
+    isSelected = false;
     device = rspDevs[devIdx];
     hwVer = device.hwVer;
 
@@ -184,6 +179,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
     _streams[0] = 0;
     _streams[1] = 0;
+    _streamsRefCount[0] = 0;
+    _streamsRefCount[1] = 0;
     useShort = true;
 
     streamActive = false;
@@ -202,6 +199,8 @@ SoapySDRPlay::~SoapySDRPlay(void)
 
     _streams[0] = 0;
     _streams[1] = 0;
+    _streamsRefCount[0] = 0;
+    _streamsRefCount[1] = 0;
 }
 
 /*******************************************************************
@@ -1118,15 +1117,6 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 {
     SoapySDR::ArgInfoList setArgs;
 
-    if (deviceSelected != &device)
-    {
-        // we need to cast away the constness of this, since releaseDevice()
-        // and selectDevice() make changes to its members
-        SoapySDRPlay *non_const_this = const_cast<SoapySDRPlay*>(this);
-        non_const_this->releaseDevice();
-        non_const_this->selectDevice();
-    }
-
 #ifdef RF_GAIN_IN_MENU
     if (device.hwVer == SDRPLAY_RSP2_ID)
     {
@@ -1629,28 +1619,26 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
 
 void SoapySDRPlay::releaseDevice()
 {
-    if (deviceSelected)
+    if (isSelected)
     {
         if (streamActive)
         {
-            sdrplay_api_Uninit(deviceSelected->dev);
+            sdrplay_api_Uninit(&device);
         }
         streamActive = false;
-        activeStream = nullptr;
-        activeSoapySDRPlay = nullptr;
 
         sdrplay_api_LockDeviceApi();
 
         sdrplay_api_ErrT err;
 
-        err = sdrplay_api_ReleaseDevice(deviceSelected);
+        err = sdrplay_api_ReleaseDevice(&device);
         if (err != sdrplay_api_Success)
         {
             sdrplay_api_UnlockDeviceApi();
             SoapySDR_logf(SOAPY_SDR_ERROR, "ReleaseDevice Error: %s", sdrplay_api_GetErrorString(err));
             throw std::runtime_error("ReleaseDevice() failed");
         }
-        deviceSelected = nullptr;
+        isSelected = false;
     }
     return;
 }
@@ -1666,10 +1654,9 @@ void SoapySDRPlay::selectDevice()
         SoapySDR_logf(SOAPY_SDR_ERROR, "SelectDevice Error: %s", sdrplay_api_GetErrorString(err));
         throw std::runtime_error("SelectDevice() failed");
     }
+    isSelected = true;
 
     sdrplay_api_UnlockDeviceApi();
-
-    deviceSelected = &device;
 
     // Enable (= sdrplay_api_DbgLvl_Verbose) API calls tracing,
     // but only for debug purposes due to its performance impact.
