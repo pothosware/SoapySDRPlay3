@@ -43,6 +43,8 @@
 #define DEFAULT_NUM_BUFFERS       (8)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
 
+#define GAIN_STEPS (29)
+
 class SoapySDRPlay: public SoapySDR::Device
 {
 public:
@@ -144,11 +146,15 @@ public:
 
     bool getGainMode(const int direction, const size_t channel) const;
 
+    void setGain(const int direction, const size_t channel, const double value);
+
     void setGain(const int direction, const size_t channel, const std::string &name, const double value);
 
     double getGain(const int direction, const size_t channel, const std::string &name) const;
 
     SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
+
+    SoapySDR::Range getGainRange(const int direction, const size_t channel) const;
 
     /*******************************************************************
      * Frequency API
