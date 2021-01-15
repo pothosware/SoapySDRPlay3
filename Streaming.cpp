@@ -395,6 +395,9 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
         return SOAPY_SDR_STREAM_ERROR;
     }
 
+    // fv
+    std::lock_guard <std::mutex> lock(sdrplay_stream->anotherMutex);
+
     // are elements left in the buffer? if not, do a new read.
     if (sdrplay_stream->nElems == 0)
     {

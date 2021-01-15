@@ -308,6 +308,9 @@ public:
         std::atomic_size_t nElems;
         size_t currentHandle;
         std::atomic_bool reset;
+
+        // fv
+        std::mutex anotherMutex;
     };
 
     SoapySDRPlayStream *_streams[2];
