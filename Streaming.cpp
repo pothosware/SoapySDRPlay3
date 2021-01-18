@@ -256,13 +256,18 @@ void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
 
     SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
 
-    bool deleteStream = true;
+    bool deleteStream = false;
     int activeStreams = 0;
     for (int i = 0; i < 2; ++i)
     {
         if (_streams[i] == sdrplay_stream)
         {
-            deleteStream = false;
+            _streamsRefCount[i]--;
+            if (_streamsRefCount[i] == 0)
+            {
+                _streams[i] = 0;
+                deleteStream = true;
+            }
         }
         activeStreams += _streamsRefCount[i];
     }
@@ -351,22 +356,7 @@ int SoapySDRPlay::deactivateStream(SoapySDR::Stream *stream, const int flags, co
         return SOAPY_SDR_NOT_SUPPORTED;
     }
 
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
-    SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
-
-    for (int i = 0; i < 2; ++i)
-    {
-        if (_streams[i] == sdrplay_stream)
-        {
-            _streamsRefCount[i]--;
-            if (_streamsRefCount[i] == 0)
-            {
-                _streams[i] = 0;
-            }
-        }
-    }
-
+    // do nothing because deactivateStream() can be called multiple times
     return 0;
 }
 
