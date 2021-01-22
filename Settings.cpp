@@ -112,6 +112,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
         SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoSampleFreq: %lf", device.rspDuoSampleFreq);
     }
 
+    isSlaveAttached = false;
+
     selectDevice();
 
     // can't set input sample rate for RSPduo slaves
@@ -191,6 +193,12 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
 SoapySDRPlay::~SoapySDRPlay(void)
 {
+    if (isSlaveAttached)
+    {
+        SoapySDR_logf(SOAPY_SDR_WARNING, "error in ~SoapySDRPlay() - trying to run the SoapySDRPlay destructor for the RSPduo master while the slave is still attached");
+        return;
+    }
+
     SoapySDRPlay_getClaimedSerials().erase(cacheKey);
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 

@@ -263,6 +263,9 @@ private:
     std::string serNo;
     std::string cacheKey;
 
+    // RSPduo specific variables
+    bool isSlaveAttached;
+
     //cached settings
     double outputSampleRate;
     std::atomic_ulong bufferLength;
