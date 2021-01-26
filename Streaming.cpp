@@ -177,14 +177,6 @@ void SoapySDRPlay::ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSele
             SoapySDR_log(SOAPY_SDR_ERROR, "master stream has been removed. Aborting.");
             throw std::runtime_error("master stream has been removed. Aborting.");
         }
-        else if (params->rspDuoModeParams.modeChangeType == sdrplay_api_SlaveAttached)
-        {
-            isSlaveAttached = true;
-        }
-        else if (params->rspDuoModeParams.modeChangeType == sdrplay_api_SlaveDllDisappeared)
-        {
-            isSlaveAttached = false;
-        }
     }
 }
 
@@ -263,12 +255,6 @@ void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
     SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
-
-    if (isSlaveAttached)
-    {
-        SoapySDR_logf(SOAPY_SDR_WARNING, "error in closeStream() - trying to close the RSPduo master while the slave is still attached");
-        return;
-    }
 
     bool deleteStream = false;
     int activeStreams = 0;
