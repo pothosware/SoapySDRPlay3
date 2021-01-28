@@ -279,6 +279,8 @@ private:
 
     std::atomic_bool useShort;
 
+    const int uninitRetryDelay = 10;   // 10 seconds before trying uninit again 
+
 public:
 
    /*******************************************************************

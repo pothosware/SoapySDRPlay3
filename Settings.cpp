@@ -1621,15 +1621,24 @@ void SoapySDRPlay::releaseDevice()
 {
     if (isSelected)
     {
+        sdrplay_api_ErrT err;
+
         if (streamActive)
         {
-            sdrplay_api_Uninit(&device);
+            while (true)
+            {
+                err = sdrplay_api_Uninit(&device);
+                if (err != sdrplay_api_StopPending)
+                {
+                    break;
+                }
+                SoapySDR_logf(SOAPY_SDR_WARNING, "Please close RSPduo slave device first. Trying again in %d seconds", uninitRetryDelay);
+                std::this_thread::sleep_for(std::chrono::seconds(uninitRetryDelay));
+            }
         }
         streamActive = false;
 
         sdrplay_api_LockDeviceApi();
-
-        sdrplay_api_ErrT err;
 
         err = sdrplay_api_ReleaseDevice(&device);
         if (err != sdrplay_api_Success)
