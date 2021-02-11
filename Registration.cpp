@@ -31,135 +31,136 @@
 #define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
 #endif
 
-static sdrplay_api_DeviceT rspDevs[SDRPLAY_MAX_DEVICES];
-sdrplay_api_DeviceT *deviceSelected = nullptr;
-SoapySDR::Stream *activeStream = nullptr;
-SoapySDRPlay *activeSoapySDRPlay = nullptr;
+static std::map<std::string, SoapySDR::Kwargs> _cachedResults;
 
 static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 {
    std::vector<SoapySDR::Kwargs> results;
-   std::string labelHint;
-   if (args.count("label") != 0) labelHint = args.at("label");
-
-   sdrplay_api_RspDuoModeT rspDuoModeHint = sdrplay_api_RspDuoMode_Unknown;
-   if (args.count("rspduo_mode") != 0)
-   {
-      try
-      {
-         rspDuoModeHint = (sdrplay_api_RspDuoModeT) stoi(args.at("rspduo_mode"));
-      }
-      catch (std::invalid_argument&)
-      {
-         rspDuoModeHint = SoapySDRPlay::stringToRSPDuoMode(args.at("rspduo_mode"));
-         if (rspDuoModeHint == sdrplay_api_RspDuoMode_Unknown)
-         {
-            throw;
-         }
-      }
-   }
-   bool isMasterAt8MhzHint = false;
-   if (args.count("rspduo_sample_freq") != 0)
-   {
-      isMasterAt8MhzHint = args.at("rspduo_sample_freq") == "8";
-   }
-
    unsigned int nDevs = 0;
    char lblstr[128];
-
-   SoapySDRPlay::sdrplay_api::get_instance();
-
-   sdrplay_api_LockDeviceApi();
-
-   if (activeStream)
-   {
-      SoapySDR_log(SOAPY_SDR_WARNING, "findSDRPlay() called while the device is streaming. Ignoring request.");
-      return results;
-   }
-
-   if (deviceSelected)
-   {
-      sdrplay_api_ReleaseDevice(deviceSelected);
-      deviceSelected = nullptr;
-   }
 
    std::string baseLabel = "SDRplay Dev";
 
    // list devices by API
+   SoapySDRPlay::sdrplay_api::get_instance();
+   sdrplay_api_LockDeviceApi();
+   sdrplay_api_DeviceT rspDevs[SDRPLAY_MAX_DEVICES];
    sdrplay_api_GetDevices(&rspDevs[0], &nDevs, SDRPLAY_MAX_DEVICES);
 
-   size_t posidx = labelHint.find(baseLabel);
-
-   int labelDevIdx = -1;
-   if (posidx != std::string::npos)
-      labelDevIdx = labelHint.at(posidx + baseLabel.length()) - 0x30;
-
-   int devIdx = 0;
-   for (unsigned int i = 0; i < nDevs; ++i)
+   for (unsigned int i = 0; i < nDevs; i++)
    {
-      switch (rspDevs[i].hwVer)
+      SoapySDR::Kwargs dev;
+      dev["serial"] = rspDevs[i].SerNo;
+      const bool serialMatch = args.count("serial") == 0 or args.at("serial") == dev["serial"];
+      if (not serialMatch) continue;
+      std::string modelName;
+      if (rspDevs[i].hwVer == SDRPLAY_RSP1_ID)
       {
-      case SDRPLAY_RSP1_ID:
-      case SDRPLAY_RSP1A_ID:
-      case SDRPLAY_RSP2_ID:
-      case SDRPLAY_RSPdx_ID:
-         if (labelDevIdx < 0 || devIdx == labelDevIdx)
+         modelName = "RSP1";
+      }
+      else if (rspDevs[i].hwVer == SDRPLAY_RSP1A_ID)
+      {
+         modelName = "RSP1A";
+      }
+      else if (rspDevs[i].hwVer == SDRPLAY_RSP2_ID)
+      {
+         modelName = "RSP2";
+      }
+      else if (rspDevs[i].hwVer == SDRPLAY_RSPdx_ID)
+      {
+         modelName = "RSPdx";
+      }
+      else
+      {
+         modelName = "UNKNOWN";
+      }
+      if (rspDevs[i].hwVer != SDRPLAY_RSPduo_ID)
+      {
+         sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+         dev["label"] = lblstr;
+         results.push_back(dev);
+         _cachedResults[dev["serial"]] = dev;
+         continue;
+      }
+
+      // RSPduo case
+      modelName = "RSPduo";
+      if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Single_Tuner)
+      {
+         dev["mode"] = "ST";
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
          {
-            SoapySDR::Kwargs dev;
-            dev["driver"] = "sdrplay";
-            sprintf_s(lblstr, 128, "%s%d %s %.*s",
-                      baseLabel.c_str(), devIdx,
-                      SoapySDRPlay::HWVertoString(rspDevs[i].hwVer).c_str(),
-                      SDRPLAY_MAX_SER_NO_LEN, rspDevs[i].SerNo);
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Single Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
             dev["label"] = lblstr;
             results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
          }
-         ++devIdx;
-         break;
-      case SDRPLAY_RSPduo_ID:
-         struct {
-            sdrplay_api_RspDuoModeT rspDuoMode; bool isMasterAt8Mhz;
-         } modes[] = {
-            { sdrplay_api_RspDuoMode_Single_Tuner, false },
-            { sdrplay_api_RspDuoMode_Dual_Tuner, false },
-            { sdrplay_api_RspDuoMode_Master, false },
-            { sdrplay_api_RspDuoMode_Master, true },
-            { sdrplay_api_RspDuoMode_Slave, false }
-         };
-         for (auto mode : modes)
+      }
+      if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Dual_Tuner)
+      {
+         dev["mode"] = "DT";
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
          {
-            if (rspDevs[i].rspDuoMode & mode.rspDuoMode)
-            {
-               if ((labelDevIdx < 0 || devIdx == labelDevIdx) &&
-                   (rspDuoModeHint == sdrplay_api_RspDuoMode_Unknown ||
-                    mode.rspDuoMode == rspDuoModeHint) &&
-                   (mode.rspDuoMode != sdrplay_api_RspDuoMode_Master ||
-                    (!isMasterAt8MhzHint || mode.isMasterAt8Mhz)))
-               {
-                  SoapySDR::Kwargs dev;
-                  dev["driver"] = "sdrplay";
-                  sprintf_s(lblstr, 128, "%s%d %s %.*s - %s%s",
-                            baseLabel.c_str(), devIdx,
-                            SoapySDRPlay::HWVertoString(rspDevs[i].hwVer).c_str(),
-                            SDRPLAY_MAX_SER_NO_LEN, rspDevs[i].SerNo,
-                            SoapySDRPlay::RSPDuoModetoString(mode.rspDuoMode).c_str(),
-                            mode.rspDuoMode == sdrplay_api_RspDuoMode_Master && mode.isMasterAt8Mhz ? " (RSPduo sample rate=8Mhz)" : "");
-                  dev["label"] = lblstr;
-                  dev["rspduo_mode"] = std::to_string(mode.rspDuoMode);
-                  if (mode.isMasterAt8Mhz)
-                  {
-                     dev["rspduo_sample_freq"] = "8";
-                  }
-                  results.push_back(dev);
-               }
-               ++devIdx;
-            }
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Dual Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
          }
-         break;
+      }
+      if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Master)
+      {
+         dev["mode"] = "MA";
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Master", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
+         }
+      }
+      if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Master)
+      {
+         dev["mode"] = "MA8";
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Master (RSPduo sample rate=8Mhz)", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
+         }
+      }
+      if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Slave)
+      {
+         dev["mode"] = "SL";
+         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Slave", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+            _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
+         }
       }
    }
 
    sdrplay_api_UnlockDeviceApi();
+
+   // fill in the cached results for claimed handles
+   for (const auto &serial : SoapySDRPlay_getClaimedSerials())
+   {
+      if (_cachedResults.count(serial) == 0) continue;
+      if (args.count("serial") != 0)
+      {
+         std::string cacheKey = args.at("serial");
+         if (args.count("mode") != 0) cacheKey += "@" + args.at("mode");
+         if (cacheKey != serial) continue;
+      }
+      results.push_back(_cachedResults.at(serial));
+   }
 
    return results;
 }

@@ -25,12 +25,6 @@
  */
 
 #include "SoapySDRPlay.hpp"
-#include <thread>
-#include <chrono>
-
-// globals declared in Registration.cpp
-extern SoapySDR::Stream *activeStream;
-extern SoapySDRPlay *activeSoapySDRPlay;
 
 std::vector<std::string> SoapySDRPlay::getStreamFormats(const int direction, const size_t channel) const
 {
@@ -242,13 +236,17 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(const int direction,
     }
     else
     {
-       throw std::runtime_error( "setupStream invalid format '" + format +
+        throw std::runtime_error( "setupStream invalid format '" + format +
                                   "' -- Only CS16 or CF32 are supported by the SoapySDRPlay module.");
     }
 
     // default is channel 0
     size_t channel = channels.size() == 0 ? 0 : channels.at(0);
-    SoapySDRPlayStream *sdrplay_stream = new SoapySDRPlayStream(channel, numBuffers, bufferLength);
+    SoapySDRPlayStream *sdrplay_stream = _streams[channel];
+    if (sdrplay_stream == 0)
+    {
+        sdrplay_stream = new SoapySDRPlayStream(channel, numBuffers, bufferLength);
+    }
     return reinterpret_cast<SoapySDR::Stream *>(sdrplay_stream);
 }
 
@@ -257,23 +255,43 @@ void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
     SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
-    _streams[sdrplay_stream->channel] = 0;
-    delete sdrplay_stream;
-    bool stopStreaming = true;
+
+    bool deleteStream = false;
+    int activeStreams = 0;
     for (int i = 0; i < 2; ++i)
     {
-        if (_streams[i] != 0)
+        if (_streams[i] == sdrplay_stream)
         {
-            stopStreaming = false;
-            break;
+            _streamsRefCount[i]--;
+            if (_streamsRefCount[i] == 0)
+            {
+                _streams[i] = 0;
+                deleteStream = true;
+            }
         }
+        activeStreams += _streamsRefCount[i];
     }
-    if (streamActive && stopStreaming)
+
+    if (deleteStream)
     {
-        sdrplay_api_Uninit(device.dev);
+        // notify readStream()
+        sdrplay_stream->cond.notify_one();
+        delete sdrplay_stream;
+    }
+    if (activeStreams == 0)
+    {
+        while (true)
+        {
+            sdrplay_api_ErrT err;
+            err = sdrplay_api_Uninit(device.dev);
+            if (err != sdrplay_api_StopPending)
+            {
+                break;
+            }
+            SoapySDR_logf(SOAPY_SDR_WARNING, "Please close RSPduo slave device first. Trying again in %d seconds", uninitRetryDelay);
+            std::this_thread::sleep_for(std::chrono::seconds(uninitRetryDelay));
+        }
         streamActive = false;
-        activeStream = nullptr;
-        activeSoapySDRPlay = nullptr;
     }
 }
 
@@ -299,6 +317,7 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     sdrplay_stream->reset = true;
     sdrplay_stream->nElems = 0;
     _streams[sdrplay_stream->channel] = sdrplay_stream;
+    _streamsRefCount[sdrplay_stream->channel]++;
 
     if (streamActive)
     {
@@ -336,8 +355,6 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     }
 
     streamActive = true;
-    activeStream = stream;
-    activeSoapySDRPlay = this;
 
     return 0;
 }
@@ -349,31 +366,7 @@ int SoapySDRPlay::deactivateStream(SoapySDR::Stream *stream, const int flags, co
         return SOAPY_SDR_NOT_SUPPORTED;
     }
 
-    SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
-
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
-    _streams[sdrplay_stream->channel] = 0;
-
-    bool stopStreaming = true;
-    for (int i = 0; i < 2; ++i)
-    {
-        if (_streams[i] != 0)
-        {
-            stopStreaming = false;
-            break;
-        }
-    }
-    if (streamActive && stopStreaming)
-    {
-        sdrplay_api_Uninit(device.dev);
-        streamActive = false;
-        activeStream = nullptr;
-        activeSoapySDRPlay = nullptr;
-        // notify readStream()
-        sdrplay_stream->cond.notify_one();
-    }
-
+    // do nothing because deactivateStream() can be called multiple times
     return 0;
 }
 
@@ -401,6 +394,9 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
         //throw std::runtime_error("readStream stream not activated");
         return SOAPY_SDR_STREAM_ERROR;
     }
+
+    // fv
+    std::lock_guard <std::mutex> lock(sdrplay_stream->anotherMutex);
 
     // are elements left in the buffer? if not, do a new read.
     if (sdrplay_stream->nElems == 0)

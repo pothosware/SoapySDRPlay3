@@ -36,12 +36,16 @@
 #include <string>
 #include <cstring>
 #include <algorithm>
+#include <set>
+#include <unordered_map>
 
 #include <sdrplay_api.h>
 
 #define DEFAULT_BUFFER_LENGTH     (65536)
 #define DEFAULT_NUM_BUFFERS       (8)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
+
+std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
 
 class SoapySDRPlay: public SoapySDR::Device
 {
@@ -248,14 +252,19 @@ private:
 
     void selectDevice();
 
+    void swapRspDuoMode(SoapySDRPlay *swapRspDuo, const SoapySDR::Kwargs &args);
+
     /*******************************************************************
      * Private variables
      ******************************************************************/
     //device settings
+    bool isSelected;
     sdrplay_api_DeviceT device;
     sdrplay_api_DeviceParamsT *deviceParams;
     sdrplay_api_RxChannelParamsT *chParams;
-    std::string hardwareKey;
+    int hwVer;
+    std::string serNo;
+    std::string cacheKey;
 
     //cached settings
     double outputSampleRate;
@@ -273,7 +282,13 @@ private:
 
     std::atomic_bool useShort;
 
+    const int uninitRetryDelay = 10;   // 10 seconds before trying uninit again 
+
 public:
+
+    // keep track of which serial number has which device
+    static std::unordered_map<std::string, SoapySDRPlay*> selectedDevices;
+
 
    /*******************************************************************
     * Public variables
@@ -302,9 +317,13 @@ public:
         std::atomic_size_t nElems;
         size_t currentHandle;
         std::atomic_bool reset;
+
+        // fv
+        std::mutex anotherMutex;
     };
 
     SoapySDRPlayStream *_streams[2];
+    int _streamsRefCount[2];
 
     constexpr static double defaultRspDuoSampleFreq = 6000000;
     constexpr static double defaultRspDuoOutputSampleRate = 2000000;
