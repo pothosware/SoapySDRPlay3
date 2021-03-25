@@ -37,6 +37,7 @@
 #include <cstring>
 #include <algorithm>
 #include <set>
+#include <unordered_map>
 
 #include <sdrplay_api.h>
 
@@ -247,24 +248,34 @@ private:
 
     static sdrplay_api_Bw_MHzT sdrPlayGetBwMhzEnum(double bw);
 
-    void releaseDevice();
+    void selectDevice(const std::string &serial, const std::string &mode, const std::string &antenna);
 
     void selectDevice();
+
+    void selectDevice(sdrplay_api_TunerSelectT tuner,
+                      sdrplay_api_RspDuoModeT rspDuoMode,
+                      double rspDuoSampleFreq,
+                      sdrplay_api_DeviceParamsT *thisDeviceParams);
+
+    void releaseDevice();
+
 
     /*******************************************************************
      * Private variables
      ******************************************************************/
     //device settings
-    bool isSelected;
     sdrplay_api_DeviceT device;
     sdrplay_api_DeviceParamsT *deviceParams;
     sdrplay_api_RxChannelParamsT *chParams;
     int hwVer;
     std::string serNo;
     std::string cacheKey;
+    // RSP device id is used to identify the device in 'selectedRSPDevices'
+    //  - serial number for RSP (except the RSPduo) and the RSPduo in non-slave mode
+    //  - serial number/S for the RSPduo in slave mode
+    std::string rspDeviceId;
 
     //cached settings
-    double outputSampleRate;
     std::atomic_ulong bufferLength;
 
     //numBuffers, bufferElems, elementsPerSample
@@ -280,6 +291,8 @@ private:
     std::atomic_bool useShort;
 
     const int uninitRetryDelay = 10;   // 10 seconds before trying uninit again 
+
+    static std::unordered_map<std::string, sdrplay_api_DeviceT*> selectedRSPDevices;
 
 public:
 
