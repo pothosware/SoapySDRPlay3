@@ -728,7 +728,7 @@ double SoapySDRPlay::getSampleRate(const int direction, const size_t channel) co
               (device.hwVer != SDRPLAY_RSPduo_ID || device.rspDuoMode == sdrplay_api_RspDuoMode_Single_Tuner)
            ))
    {
-      SoapySDR_log(SOAPY_SDR_ERROR, "Invalid sameple rate and/or IF setting");
+      SoapySDR_logf(SOAPY_SDR_ERROR, "Invalid sample rate and/or IF setting - fsHz=%lf ifType=%d hwVer=%d rspDuoMode=%d rspDuoSampleFreq=%lf", fsHz, chParams->tunerParams.ifType, device.hwVer, device.rspDuoMode, device.rspDuoSampleFreq);
       throw std::runtime_error("Invalid sample rate and/or IF setting");
    }
 
