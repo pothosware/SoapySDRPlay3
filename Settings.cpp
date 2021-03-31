@@ -48,20 +48,13 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     selectDevice(args.at("serial"),
                  args.count("mode") ? args.at("mode") : "",
                  args.count("antenna") ? args.at("antenna") : "");
-
-    sdrplay_api_ErrT err;
-    err = sdrplay_api_GetDeviceParams(device.dev, &deviceParams);
-    if (err != sdrplay_api_Success)
-    {
-        SoapySDR_logf(SOAPY_SDR_ERROR, "GetDeviceParams Error: %s", sdrplay_api_GetErrorString(err));
-        throw std::runtime_error("GetDeviceParams() failed");
-    }
-    chParams = device.tuner == sdrplay_api_Tuner_B ? deviceParams->rxChannelB : deviceParams->rxChannelA;
+SoapySDR_logf(SOAPY_SDR_INFO, "deviceParams - fsHz=%lf ifType=%d hwVer=%d rspDuoMode=%d rspDuoSampleFreq=%lf", deviceParams->devParams->fsFreq.fsHz, chParams->tunerParams.ifType, device.hwVer, device.rspDuoMode, device.rspDuoSampleFreq);
 
     // keep all the default settings:
     // - rf: 200MHz
     // - fs: 2MHz
     // - decimation: off
+    // - IF: 0kHz (zero IF)
     // - bw: 200kHz
     // - attenuation: 50dB
     // - LNA state: 0
@@ -723,7 +716,7 @@ double SoapySDRPlay::getSampleRate(const int direction, const size_t channel) co
    {
       fsHz = 2.0e6;
    }
-   else if (!(fsHz > 2.0e6 &&
+   else if (!(fsHz >= 2.0e6 &&
               chParams->tunerParams.ifType == sdrplay_api_IF_Zero &&
               (device.hwVer != SDRPLAY_RSPduo_ID || device.rspDuoMode == sdrplay_api_RspDuoMode_Single_Tuner)
            ))
