@@ -36,12 +36,16 @@
 #include <string>
 #include <cstring>
 #include <algorithm>
+#include <set>
+#include <unordered_map>
 
 #include <sdrplay_api.h>
 
 #define DEFAULT_BUFFER_LENGTH     (65536)
 #define DEFAULT_NUM_BUFFERS       (8)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
+
+std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
 
 class SoapySDRPlay: public SoapySDR::Device
 {
@@ -244,9 +248,17 @@ private:
 
     static sdrplay_api_Bw_MHzT sdrPlayGetBwMhzEnum(double bw);
 
-    void releaseDevice();
+    void selectDevice(const std::string &serial, const std::string &mode, const std::string &antenna);
 
     void selectDevice();
+
+    void selectDevice(sdrplay_api_TunerSelectT tuner,
+                      sdrplay_api_RspDuoModeT rspDuoMode,
+                      double rspDuoSampleFreq,
+                      sdrplay_api_DeviceParamsT *thisDeviceParams);
+
+    void releaseDevice();
+
 
     /*******************************************************************
      * Private variables
@@ -255,10 +267,15 @@ private:
     sdrplay_api_DeviceT device;
     sdrplay_api_DeviceParamsT *deviceParams;
     sdrplay_api_RxChannelParamsT *chParams;
-    std::string hardwareKey;
+    int hwVer;
+    std::string serNo;
+    std::string cacheKey;
+    // RSP device id is used to identify the device in 'selectedRSPDevices'
+    //  - serial number for RSP (except the RSPduo) and the RSPduo in non-slave mode
+    //  - serial number/S for the RSPduo in slave mode
+    std::string rspDeviceId;
 
     //cached settings
-    double outputSampleRate;
     std::atomic_ulong bufferLength;
 
     //numBuffers, bufferElems, elementsPerSample
@@ -272,6 +289,10 @@ private:
     std::atomic_bool streamActive;
 
     std::atomic_bool useShort;
+
+    const int uninitRetryDelay = 10;   // 10 seconds before trying uninit again 
+
+    static std::unordered_map<std::string, sdrplay_api_DeviceT*> selectedRSPDevices;
 
 public:
 
@@ -302,9 +323,13 @@ public:
         std::atomic_size_t nElems;
         size_t currentHandle;
         std::atomic_bool reset;
+
+        // fv
+        std::mutex anotherMutex;
     };
 
     SoapySDRPlayStream *_streams[2];
+    int _streamsRefCount[2];
 
     constexpr static double defaultRspDuoSampleFreq = 6000000;
     constexpr static double defaultRspDuoOutputSampleRate = 2000000;
