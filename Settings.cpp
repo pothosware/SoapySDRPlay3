@@ -48,7 +48,6 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     selectDevice(args.at("serial"),
                  args.count("mode") ? args.at("mode") : "",
                  args.count("antenna") ? args.at("antenna") : "");
-SoapySDR_logf(SOAPY_SDR_INFO, "deviceParams - fsHz=%lf ifType=%d hwVer=%d rspDuoMode=%d rspDuoSampleFreq=%lf", deviceParams->devParams->fsFreq.fsHz, chParams->tunerParams.ifType, device.hwVer, device.rspDuoMode, device.rspDuoSampleFreq);
 
     // keep all the default settings:
     // - rf: 200MHz
