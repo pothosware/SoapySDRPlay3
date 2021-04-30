@@ -1,7 +1,7 @@
 ########################################################################
 # Build Soapy SDR support module for SDRplay (API version 3)
 ########################################################################
-cmake_minimum_required(VERSION 2.8.7)
+cmake_minimum_required(VERSION 3.13)
 project(SoapySDRPlay CXX)
 
 find_package(SoapySDR "0.4.0" NO_MODULE REQUIRED)
@@ -32,6 +32,13 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     add_definitions(-Wno-unused-parameter)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
+# Configurable feature set
+SET (STREAMING_USB_MODE_BULK OFF CACHE BOOL "Use USB bulk mode instead of isochronous")
+
+IF(STREAMING_USB_MODE_BULK)
+    ADD_DEFINITIONS( -DSTREAMING_USB_MODE_BULK=1 )
+ENDIF()
+
 SOAPY_SDR_MODULE_UTIL(
     TARGET sdrPlaySupport
     SOURCES
@@ -48,3 +55,14 @@ SOAPY_SDR_MODULE_UTIL(
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 10)
     target_link_options(sdrPlaySupport PRIVATE -pthread)
 endif ()
+
+########################################################################
+# uninstall target
+########################################################################
+add_custom_target(uninstall
+    "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    IMMEDIATE @ONLY)
+

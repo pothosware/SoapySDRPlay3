@@ -34,6 +34,7 @@ SoapySDRPlay::sdrplay_api::sdrplay_api()
     err = sdrplay_api_Open();
     if (err != sdrplay_api_Success) {
         SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Open() Error: %s", sdrplay_api_GetErrorString(err));
+        SoapySDR_logf(SOAPY_SDR_ERROR, "Please check the sdrplay_api service to make sure it is up. If it is up, please restart it.");
         throw std::runtime_error("sdrplay_api_Open() failed");
     }
 
