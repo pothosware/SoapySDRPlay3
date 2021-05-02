@@ -45,9 +45,10 @@
 #define DEFAULT_NUM_BUFFERS       (8)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
 
-#define GAIN_STEPS (29)
-
 std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
+
+int getMaxRFGR(unsigned char hwVer);
+
 
 class SoapySDRPlay: public SoapySDR::Device
 {
@@ -150,13 +151,20 @@ public:
 
     bool getGainMode(const int direction, const size_t channel) const;
 
+#if defined GAIN_MODE_SDRplay || defined GAIN_MODE_DB
     void setGain(const int direction, const size_t channel, const double value);
+#endif
 
     void setGain(const int direction, const size_t channel, const std::string &name, const double value);
+
+#if defined GAIN_MODE_DB
+    double getGain(const int direction, const size_t channel) const;
+#endif
 
     double getGain(const int direction, const size_t channel, const std::string &name) const;
 
     SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
+
 
     /*******************************************************************
      * Frequency API
@@ -248,7 +256,7 @@ private:
 
     static sdrplay_api_Bw_MHzT getBwEnumForRate(double output_sample_rate);
 
-    static  double getBwValueFromEnum(sdrplay_api_Bw_MHzT bwEnum);
+    static double getBwValueFromEnum(sdrplay_api_Bw_MHzT bwEnum);
 
     static sdrplay_api_Bw_MHzT sdrPlayGetBwMhzEnum(double bw);
 
@@ -262,6 +270,15 @@ private:
                       sdrplay_api_DeviceParamsT *thisDeviceParams);
 
     void releaseDevice();
+
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+    /* LNA state gain reduction tables functions */
+    void updateRSP1LNAstateGainReductions();
+    void updateRSP1ALNAstateGainReductions();
+    void updateRSP2LNAstateGainReductions();
+    void updateRSPduoLNAstateGainReductions();
+    void updateRSPdxLNAstateGainReductions();
+#endif
 
 
     /*******************************************************************
@@ -278,6 +295,12 @@ private:
     //  - serial number for RSP (except the RSPduo) and the RSPduo in non-slave mode
     //  - serial number/S for the RSPduo in slave mode
     std::string rspDeviceId;
+
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+    void (SoapySDRPlay::*updateLNAstateGainReductions)();
+    int maxLNAstate;
+    int *LNAstateGainReductions;
+#endif
 
     //cached settings
     std::atomic_ulong bufferLength;

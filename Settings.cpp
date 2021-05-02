@@ -61,6 +61,30 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     // - DC correction: on
     // - IQ balance: on
 
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+    switch (hwVer) {
+        case SDRPLAY_RSP1_ID:
+            updateLNAstateGainReductions = &SoapySDRPlay::updateRSP1LNAstateGainReductions;
+            break;
+        case SDRPLAY_RSP1A_ID:
+            updateLNAstateGainReductions = &SoapySDRPlay::updateRSP1ALNAstateGainReductions;
+            break;
+        case SDRPLAY_RSP2_ID:
+            updateLNAstateGainReductions = &SoapySDRPlay::updateRSP2LNAstateGainReductions;
+            break;
+        case SDRPLAY_RSPduo_ID:
+            updateLNAstateGainReductions = &SoapySDRPlay::updateRSPduoLNAstateGainReductions;
+            break;
+        case SDRPLAY_RSPdx_ID:
+            updateLNAstateGainReductions = &SoapySDRPlay::updateRSPdxLNAstateGainReductions;
+            break;
+    }
+    (this->*updateLNAstateGainReductions)();
+    if (chParams->tunerParams.gain.LNAstate > maxLNAstate) {
+        chParams->tunerParams.gain.LNAstate = maxLNAstate;
+    }
+#endif
+
     // process additional device string arguments
     for (std::pair<std::string, std::string> arg : args) {
         // ignore 'driver', 'label', 'mode', 'serial', and 'soapy'
@@ -258,6 +282,17 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
                 }
             }
         }
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+        (this->*updateLNAstateGainReductions)();
+        if (chParams->tunerParams.gain.LNAstate > maxLNAstate)
+        {
+            chParams->tunerParams.gain.LNAstate = maxLNAstate;
+            if (streamActive)
+            {
+                sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+            }
+        }
+#endif
     }
     else if (device.hwVer == SDRPLAY_RSPdx_ID)
     {
@@ -346,6 +381,17 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
                 chParams->rspDuoTunerParams.biasTEnable = biasTen;
             }
         }
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+        (this->*updateLNAstateGainReductions)();
+        if (chParams->tunerParams.gain.LNAstate > maxLNAstate)
+        {
+            chParams->tunerParams.gain.LNAstate = maxLNAstate;
+            if (streamActive)
+            {
+                sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+            }
+        }
+#endif
     }
 }
 
@@ -435,228 +481,8 @@ bool SoapySDRPlay::hasDCOffset(const int direction, const size_t channel) const
  * Gain API
  ******************************************************************/
 
-std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
-{
-    //list available gain elements,
-    //the functions below have a "name" parameter
-    std::vector<std::string> results;
+/* Gains API methods are now defined in Gain${GAIN_MODE}.cpp source files */
 
-    // only return the gains (not the GRs)
-    //results.push_back("IFGR");
-    results.push_back("IF");
-    //results.push_back("RFGR");
-    results.push_back("RF");
-
-    return results;
-}
-
-bool SoapySDRPlay::hasGainMode(const int direction, const size_t channel) const
-{
-    return true;
-}
-
-void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
-{
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
-    sdrplay_api_AgcControlT agc_control = automatic ? sdrplay_api_AGC_CTRL_EN : sdrplay_api_AGC_DISABLE;
-    if (chParams->ctrlParams.agc.enable != agc_control)
-    {
-        chParams->ctrlParams.agc.enable = agc_control;
-        if (streamActive)
-        {
-            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
-        }
-    }
-}
-
-bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
-{
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
-    return chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
-}
-
-static int getMaxRFGR(unsigned char hwVer)
-{
-   switch(hwVer)
-   {
-      case SDRPLAY_RSP1_ID:
-         return 3;
-      case SDRPLAY_RSP1A_ID:
-         return 9;
-      case SDRPLAY_RSP2_ID:
-         return 8;
-      case SDRPLAY_RSPduo_ID:
-         return 9;
-      case SDRPLAY_RSPdx_ID:
-         return 27;
-      default:
-         return 0;
-   }
-}
-
-void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
-{
-   std::lock_guard <std::mutex> lock(_general_state_mutex);
-   bool doUpdate = false;
-
-   const uint8_t rsp1_lnastates[] = { 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1,
-       2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rsp1_ifgains[] = { 59, 56, 53, 50, 47, 44, 41, 58, 55, 52, 49,
-       46, 43, 45, 42, 58, 55, 52, 49, 46, 43, 41, 38, 35, 32, 29, 26, 23, 20 };
-   const uint8_t rsp1a_lnastates[] = { 9, 9, 9, 9, 9, 9, 8, 7, 7, 7, 7, 7, 6,
-       6, 5, 5, 4, 3, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rsp1a_ifgains[] = { 59, 55, 52, 48, 45, 41, 42, 58, 54, 51, 47,
-       43, 46, 42, 44, 41, 43, 42, 44, 40, 43, 45, 42, 38, 34, 31, 27, 24, 20 };
-   const uint8_t rsp2_lnastates[] = { 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 6, 5, 5,
-       4, 4, 4, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rsp2_ifgains[] = { 59, 55, 52, 48, 44, 41, 56, 52, 49, 45, 41,
-       44, 45, 41, 48, 44, 40, 45, 42, 43, 49, 46, 42, 38, 35, 31, 27, 24, 20 };
-   const uint8_t rspduo_lnastates[] = { 9, 9, 9, 9, 9, 9, 8, 7, 7, 7, 7, 7, 6,
-       6, 5, 5, 4, 3, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rspduo_ifgains[] = { 59, 55, 52, 48, 45, 41, 42, 58, 54, 51,
-       47, 43, 46, 42, 44, 41, 43, 42, 44, 40, 43, 45, 42, 38, 34, 31, 27, 24,
-       20 };
-   const uint8_t rspdx_lnastates[] = { 26, 26, 26, 26, 26, 25, 23, 22, 20, 19,
-       17, 16, 14, 13, 11, 10, 8, 7, 5, 5, 5, 3, 2, 0, 0, 0, 0, 0, 0 };
-   const uint8_t rspdx_ifgains[] = { 59, 55, 50, 46, 41, 40, 42, 40, 42, 40, 42,
-       41, 42, 41, 43, 41, 43, 41, 49, 45, 40, 42, 40, 42, 38, 33, 29, 24, 20 };
-
-   int gain = std::max(0, (int)value);
-   int max_gain;
-   int rfGR = 0;
-   int ifGR = 0;
-
-   switch(device.hwVer)
-   {
-      case SDRPLAY_RSP1_ID:
-         max_gain = sizeof(rsp1_lnastates) / sizeof(rsp1_lnastates[0]) - 1;
-         rfGR = rsp1_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rsp1_ifgains) / sizeof(rsp1_ifgains[0]) - 1;
-         ifGR = rsp1_ifgains[std::min(gain, max_gain)];
-         break;
-      case SDRPLAY_RSP1A_ID:
-         max_gain = sizeof(rsp1a_lnastates) / sizeof(rsp1a_lnastates[0]) - 1;
-         rfGR = rsp1a_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rsp1a_ifgains) / sizeof(rsp1a_ifgains[0]) - 1;
-         ifGR = rsp1a_ifgains[std::min(gain, max_gain)];
-         break;
-      case SDRPLAY_RSP2_ID:
-         max_gain = sizeof(rsp2_lnastates) / sizeof(rsp2_lnastates[0]) - 1;
-         rfGR = rsp2_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rsp2_ifgains) / sizeof(rsp2_ifgains[0]) - 1;
-         ifGR = rsp2_ifgains[std::min(gain, max_gain)];
-         break;
-      case SDRPLAY_RSPduo_ID:
-         max_gain = sizeof(rspduo_lnastates) / sizeof(rspduo_lnastates[0]) - 1;
-         rfGR = rspduo_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rspduo_ifgains) / sizeof(rspduo_ifgains[0]) - 1;
-         ifGR = rspduo_ifgains[std::min(gain, max_gain)];
-         break;
-      case SDRPLAY_RSPdx_ID:
-         max_gain = sizeof(rspdx_lnastates) / sizeof(rspdx_lnastates[0]) - 1;
-         rfGR = rspdx_lnastates[std::min(gain, max_gain)];
-         max_gain = sizeof(rspdx_ifgains) / sizeof(rspdx_ifgains[0]) - 1;
-         ifGR = rspdx_ifgains[std::min(gain, max_gain)];
-         break;
-   }
-
-   if (chParams->tunerParams.gain.gRdB != ifGR && chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
-   {
-      chParams->tunerParams.gain.gRdB = ifGR;
-      doUpdate = true;
-   }
-
-   if (chParams->tunerParams.gain.LNAstate != rfGR)
-   {
-      chParams->tunerParams.gain.LNAstate = rfGR;
-      doUpdate = true;
-   }
-
-   if (doUpdate && streamActive)
-   {
-      sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr,
-                         sdrplay_api_Update_Ext1_None);
-   }
-}
-
-void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
-{
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
-   bool doUpdate = false;
-
-   if (chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
-   {
-      if (name == "IFGR" || name == "IF")
-      {
-         return;
-      }
-   }
-
-   if (name == "IF" || name == "IFGR")
-   {
-      int ifGR = (name == "IF") ? 20 + (59 - value) : value;
-      if (chParams->tunerParams.gain.gRdB != ifGR)
-      {
-         chParams->tunerParams.gain.gRdB = ifGR;
-         doUpdate = true;
-      }
-   }
-   else if (name == "RF" || name == "RFGR")
-   {
-      int rfGR = (name == "RF") ? getMaxRFGR(device.hwVer) - value : value;
-      if (chParams->tunerParams.gain.LNAstate != rfGR) {
-
-          chParams->tunerParams.gain.LNAstate = rfGR;
-          doUpdate = true;
-      }
-   }
-
-   if (doUpdate && streamActive)
-   {
-      sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr,
-                         sdrplay_api_Update_Ext1_None);
-   }
-}
-
-double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
-{
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
-   if (name == "IFGR")
-   {
-       return chParams->tunerParams.gain.gRdB;
-   }
-   else if (name == "IF")
-   {
-       return 20 + (59 - chParams->tunerParams.gain.gRdB);
-   }
-   else if (name == "RFGR")
-   {
-      return chParams->tunerParams.gain.LNAstate;
-   }
-   else if (name == "RF")
-   {
-      return getMaxRFGR(device.hwVer) - chParams->tunerParams.gain.LNAstate;
-   }
-
-   return 0;
-}
-
-SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
-{
-   if (name == "IFGR" || name == "IF")
-   {
-      return SoapySDR::Range(20, 59);
-   }
-   else if (name == "RFGR" || name == "RF")
-   {
-      return SoapySDR::Range(0, getMaxRFGR(device.hwVer));
-   }
-   return SoapySDR::Range(20, 59);
-}
 
 /*******************************************************************
  * Frequency API
@@ -679,6 +505,16 @@ void SoapySDRPlay::setFrequency(const int direction,
          {
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
          }
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+         (this->*updateLNAstateGainReductions)();
+         if (chParams->tunerParams.gain.LNAstate > maxLNAstate) {
+            chParams->tunerParams.gain.LNAstate = maxLNAstate;
+            if (streamActive)
+            {
+               sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+            }
+         }
+#endif
       }
       // can't set ppm for RSPduo slaves
       else if ((name == "CORR") && deviceParams->devParams &&
@@ -1154,118 +990,15 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     SoapySDRPlay *non_const_this = const_cast<SoapySDRPlay*>(this);
     non_const_this->selectDevice();
 
-    if (device.hwVer == SDRPLAY_RSP2_ID)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       setArgs.push_back(RfGainArg);
-    }
-    else if (device.hwVer == SDRPLAY_RSPduo_ID)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       RfGainArg.options.push_back("9");
-       setArgs.push_back(RfGainArg);
-    }
-    else if (device.hwVer == SDRPLAY_RSP1A_ID)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       RfGainArg.options.push_back("9");
-       setArgs.push_back(RfGainArg);
-    }
-    else if (device.hwVer == SDRPLAY_RSPdx_ID)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       RfGainArg.options.push_back("9");
-       RfGainArg.options.push_back("10");
-       RfGainArg.options.push_back("11");
-       RfGainArg.options.push_back("12");
-       RfGainArg.options.push_back("13");
-       RfGainArg.options.push_back("14");
-       RfGainArg.options.push_back("15");
-       RfGainArg.options.push_back("16");
-       RfGainArg.options.push_back("17");
-       RfGainArg.options.push_back("18");
-       RfGainArg.options.push_back("19");
-       RfGainArg.options.push_back("20");
-       RfGainArg.options.push_back("21");
-       RfGainArg.options.push_back("22");
-       RfGainArg.options.push_back("23");
-       RfGainArg.options.push_back("24");
-       RfGainArg.options.push_back("25");
-       RfGainArg.options.push_back("26");
-       RfGainArg.options.push_back("27");
-       setArgs.push_back(RfGainArg);
-    }
-    else
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "1";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       setArgs.push_back(RfGainArg);
-    }
-//#endif
+    int maxRFGR = getMaxRFGR(device.hwVer);
+    SoapySDR::ArgInfo RfGainArg;
+    RfGainArg.key = "rfgain_sel";
+    RfGainArg.value = maxRFGR / 2;
+    RfGainArg.name = "RF Gain Select";
+    RfGainArg.description = "RF Gain Select";
+    RfGainArg.type = SoapySDR::ArgInfo::INT;
+    RfGainArg.range = SoapySDR::Range(0, maxRFGR);
+    setArgs.push_back(RfGainArg);
 
     SoapySDR::ArgInfo IQcorrArg;
     IQcorrArg.key = "iqcorr_ctrl";

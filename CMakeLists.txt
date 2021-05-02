@@ -39,14 +39,35 @@ IF(STREAMING_USB_MODE_BULK)
     ADD_DEFINITIONS( -DSTREAMING_USB_MODE_BULK=1 )
 ENDIF()
 
+# Gain modes
+SET (GAIN_MODE "Legacy" CACHE STRING "Gain mode selection")
+SET_PROPERTY(CACHE GAIN_MODE PROPERTY STRINGS Legacy SDRplay LNA DB)
+ADD_DEFINITIONS( -DGAIN_MODE_${GAIN_MODE} )
+IF(GAIN_MODE STREQUAL "LNA")
+    ADD_DEFINITIONS( -DGAIN_MODE_LNA_POSITIVE -DGAIN_MODE_IF_OFFSET_DB=79 )
+ENDIF()
+IF(GAIN_MODE STREQUAL "DB")
+    ADD_DEFINITIONS( -DGAIN_MODE_RF_OFFSET_DB=100 -DGAIN_MODE_IF_OFFSET_DB=79 )
+ENDIF()
+
+
+SET (SOURCES
+    SoapySDRPlay.hpp
+    Registration.cpp
+    sdrplay_api.cpp
+    Settings.cpp
+    Streaming.cpp
+    Gain${GAIN_MODE}.cpp
+)
+IF(GAIN_MODE STREQUAL "LNA" OR GAIN_MODE STREQUAL "DB")
+    LIST(APPEND SOURCES GainLNAstateTables.cpp)
+ENDIF()
+
+
 SOAPY_SDR_MODULE_UTIL(
     TARGET sdrPlaySupport
     SOURCES
-        SoapySDRPlay.hpp
-        Registration.cpp
-        sdrplay_api.cpp
-        Settings.cpp
-        Streaming.cpp
+        ${SOURCES}
     LIBRARIES
         ${LIBSDRPLAY_LIBRARIES}
 )
