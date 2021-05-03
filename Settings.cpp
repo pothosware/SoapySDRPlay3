@@ -61,7 +61,7 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     // - DC correction: on
     // - IQ balance: on
 
-#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB || defined GAIN_MODE_Normalized
     switch (hwVer) {
         case SDRPLAY_RSP1_ID:
             updateLNAstateGainReductions = &SoapySDRPlay::updateRSP1LNAstateGainReductions;
@@ -282,7 +282,7 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
                 }
             }
         }
-#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB || defined GAIN_MODE_Normalized
         (this->*updateLNAstateGainReductions)();
         if (chParams->tunerParams.gain.LNAstate > maxLNAstate)
         {
@@ -381,7 +381,7 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
                 chParams->rspDuoTunerParams.biasTEnable = biasTen;
             }
         }
-#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB || defined GAIN_MODE_Normalized
         (this->*updateLNAstateGainReductions)();
         if (chParams->tunerParams.gain.LNAstate > maxLNAstate)
         {
@@ -505,7 +505,7 @@ void SoapySDRPlay::setFrequency(const int direction,
          {
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
          }
-#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB
+#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB || defined GAIN_MODE_Normalized
          (this->*updateLNAstateGainReductions)();
          if (chParams->tunerParams.gain.LNAstate > maxLNAstate) {
             chParams->tunerParams.gain.LNAstate = maxLNAstate;
