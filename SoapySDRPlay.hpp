@@ -151,13 +151,13 @@ public:
 
     bool getGainMode(const int direction, const size_t channel) const;
 
-#if defined GAIN_MODE_SDRplay || defined GAIN_MODE_DB || defined GAIN_MODE_Normalized
+#ifdef GAIN_MODE_HAS_SET_GAIN
     void setGain(const int direction, const size_t channel, const double value);
 #endif
 
     void setGain(const int direction, const size_t channel, const std::string &name, const double value);
 
-#if defined GAIN_MODE_DB || defined GAIN_MODE_Normalized
+#ifdef GAIN_MODE_HAS_GET_GAIN
     double getGain(const int direction, const size_t channel) const;
 #endif
 
@@ -271,7 +271,7 @@ private:
 
     void releaseDevice();
 
-#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB || defined GAIN_MODE_Normalized
+#ifdef GAIN_MODE_USE_RF_GAIN_TABLES
     /* LNA state gain reduction tables functions */
     void updateRSP1LNAstateGainReductions();
     void updateRSP1ALNAstateGainReductions();
@@ -296,7 +296,7 @@ private:
     //  - serial number/S for the RSPduo in slave mode
     std::string rspDeviceId;
 
-#if defined GAIN_MODE_LNA || defined GAIN_MODE_DB || defined GAIN_MODE_Normalized
+#ifdef GAIN_MODE_USE_RF_GAIN_TABLES
     void (SoapySDRPlay::*updateLNAstateGainReductions)();
     int maxLNAstate;
     int *LNAstateGainReductions;
