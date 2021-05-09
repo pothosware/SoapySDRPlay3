@@ -153,21 +153,53 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    return SoapySDR::Range(20, 59);
 }
 
-int getMaxRFGR(unsigned char hwVer)
+
+/* RfGainSetting methods */
+std::string SoapySDRPlay::getRfGainSettingName() const
 {
-   switch(hwVer)
+   return "RF Gain Select";
+}
+
+int *SoapySDRPlay::getRfGainSettingOptions(int &length, int &defaultValue) const
+{
+   static int options[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27};
+   switch(device.hwVer)
    {
       case SDRPLAY_RSP1_ID:
-         return 3;
+         length = 3 + 1;
+         defaultValue = options[1];
+         break;
       case SDRPLAY_RSP1A_ID:
-         return 9;
+         length = 9 + 1;
+         defaultValue = options[4];
+         break;
       case SDRPLAY_RSP2_ID:
-         return 8;
+         length = 8 + 1;
+         defaultValue = options[4];
+         break;
       case SDRPLAY_RSPduo_ID:
-         return 9;
+         length = 9 + 1;
+         defaultValue = options[4];
+         break;
       case SDRPLAY_RSPdx_ID:
-         return 27;
+         length = 27 + 1;
+         defaultValue = options[4];
+         break;
       default:
-         return 0;
+         length = 1;
+         defaultValue = options[0];
+         break;
    }
+   return options;
+}
+
+int SoapySDRPlay::readRfGainSetting() const
+{
+   return static_cast<int>(chParams->tunerParams.gain.LNAstate);
+}
+
+void SoapySDRPlay::writeRfGainSetting(int value)
+{
+   chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(value);
+   return;
 }

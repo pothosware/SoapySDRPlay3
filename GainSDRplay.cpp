@@ -88,7 +88,7 @@ bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
     return chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
 }
 
-int getMaxRFGR(unsigned char hwVer)
+static int getMaxRFGR(unsigned char hwVer)
 {
    switch(hwVer)
    {
@@ -256,4 +256,31 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
       return SoapySDR::Range(0, getMaxRFGR(device.hwVer));
    }
    return SoapySDR::Range(20, 59);
+}
+
+
+/* RfGainSetting methods */
+std::string SoapySDRPlay::getRfGainSettingName() const
+{
+   return "RF Gain Select";
+}
+
+int *SoapySDRPlay::getRfGainSettingOptions(int &length, int &defaultValue) const
+{
+   static int options[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27};
+   int maxRFGR = getMaxRFGR(device.hwVer);
+   length = maxRFGR + 1;
+   defaultValue = maxRFGR > options[4] ? options[4] : options[1];
+   return options;
+}
+
+int SoapySDRPlay::readRfGainSetting() const
+{
+   return static_cast<int>(chParams->tunerParams.gain.LNAstate);
+}
+
+void SoapySDRPlay::writeRfGainSetting(int value)
+{
+   chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(value);
+   return;
 }

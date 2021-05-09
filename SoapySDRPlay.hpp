@@ -47,9 +47,6 @@
 
 std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
 
-int getMaxRFGR(unsigned char hwVer);
-
-
 class SoapySDRPlay: public SoapySDR::Device
 {
 public:
@@ -279,6 +276,12 @@ private:
     void updateRSPduoLNAstateGainReductions();
     void updateRSPdxLNAstateGainReductions();
 #endif
+
+    /* RfGainSetting methods */
+    std::string getRfGainSettingName() const;
+    int *getRfGainSettingOptions(int &length, int &defaultValue) const;
+    int readRfGainSetting() const;
+    void writeRfGainSetting(int value);
 
 
     /*******************************************************************

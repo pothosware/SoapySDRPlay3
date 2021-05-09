@@ -24,7 +24,7 @@
  */
 
 /* Gain mode with RF 'gain' in dB
- *   - RF: RF gain in dB defined as: GAIN_MODE_RF_OFFSET_DB - RFGRdB (function of LNA state)
+ *   - RF: RF gain in dB defined as: maxRFGRdB - RFGRdB (function of LNA state)
  *                 higher values mean more gain - range: varies
  *   - IF: IF gain in dB defined as: GAIN_MODE_IF_OFFSET_DB - IFGR
  *                 higher values mean more gain - range: 20-59 (or from -59 to -20)
@@ -43,9 +43,7 @@
 #ifndef GAIN_MODE_IF_OFFSET_DB
 #define GAIN_MODE_IF_OFFSET_DB 0
 #endif
-#ifndef GAIN_MODE_RF_OFFSET_DB
-#define GAIN_MODE_RF_OFFSET_DB 0
-#endif
+#define GAIN_STEPS (29)
 
 
 std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
@@ -124,7 +122,11 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
    if (name == "RF")
    {
-      double rfgRdB = GAIN_MODE_RF_OFFSET_DB - value;
+#ifdef GAIN_MODE_DB_POSITIVE
+      double rfgRdB = LNAstateGainReductions[maxLNAstate] - value;
+#else
+      double rfgRdB = LNAstateGainReductions[0] - value;
+#endif
       // find the closest LNA state
       int LNAstate = 0;
       double minDiff = DBL_MAX;
@@ -168,7 +170,12 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
 
    if (name == "RF")
    {
-      return GAIN_MODE_RF_OFFSET_DB - LNAstateGainReductions[chParams->tunerParams.gain.LNAstate];
+#ifdef GAIN_MODE_DB_POSITIVE
+      return LNAstateGainReductions[maxLNAstate] - LNAstateGainReductions[chParams->tunerParams.gain.LNAstate];
+#else
+      return LNAstateGainReductions[0] - LNAstateGainReductions[chParams->tunerParams.gain.LNAstate];
+
+#endif
    }
    else if (name == "IF")
    {
@@ -181,9 +188,11 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
 {
    if (name == "RF")
    {
-      return SoapySDR::Range(
-              GAIN_MODE_RF_OFFSET_DB - LNAstateGainReductions[maxLNAstate],
-              GAIN_MODE_RF_OFFSET_DB - LNAstateGainReductions[0]);
+#ifdef GAIN_MODE_DB_POSITIVE
+      return SoapySDR::Range(0, LNAstateGainReductions[maxLNAstate] - LNAstateGainReductions[0]);
+#else
+      return SoapySDR::Range(LNAstateGainReductions[0] - LNAstateGainReductions[maxLNAstate], 0);
+#endif
    }
    else if (name == "IF")
    {
@@ -194,21 +203,59 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    return SoapySDR::Range(0, 0);
 }
 
-int getMaxRFGR(unsigned char hwVer)
+
+/* RfGainSetting methods */
+std::string SoapySDRPlay::getRfGainSettingName() const
 {
-   switch(hwVer)
+   return "RF Gain (dB)";
+}
+
+int *SoapySDRPlay::getRfGainSettingOptions(int &length, int &defaultValue) const
+{
+   static int options[GAIN_STEPS];
+   for (int i = 0; i <= maxLNAstate; i++)
    {
-      case SDRPLAY_RSP1_ID:
-         return 3;
-      case SDRPLAY_RSP1A_ID:
-         return 9;
-      case SDRPLAY_RSP2_ID:
-         return 8;
-      case SDRPLAY_RSPduo_ID:
-         return 9;
-      case SDRPLAY_RSPdx_ID:
-         return 27;
-      default:
-         return 0;
+#ifdef GAIN_MODE_DB_POSITIVE
+      options[i] = LNAstateGainReductions[maxLNAstate] - LNAstateGainReductions[maxLNAstate - i];
+#else
+      options[i] = LNAstateGainReductions[0] - LNAstateGainReductions[maxLNAstate - i];
+#endif
    }
+   length = maxLNAstate + 1;
+   defaultValue = options[length / 2];
+   return options;
+}
+
+int SoapySDRPlay::readRfGainSetting() const
+{
+#ifdef GAIN_MODE_DB_POSITIVE
+   return LNAstateGainReductions[maxLNAstate] - LNAstateGainReductions[chParams->tunerParams.gain.LNAstate];
+#else
+   return LNAstateGainReductions[0] - LNAstateGainReductions[chParams->tunerParams.gain.LNAstate];
+#endif
+}
+
+void SoapySDRPlay::writeRfGainSetting(int value)
+{
+#ifdef GAIN_MODE_DB_POSITIVE
+   int rfgRdB = LNAstateGainReductions[maxLNAstate] - value;
+#else
+   int rfgRdB = LNAstateGainReductions[0] - value;
+#endif
+   // find the first LNA state that matches the requested gain reduction
+   int LNAstate = -1;
+   for (int i = 0; i <= maxLNAstate; i++) {
+      if (LNAstateGainReductions[i] == rfgRdB)
+      {
+         LNAstate = i;
+         break;
+      }
+   }
+   if (LNAstate == -1)
+   {
+      SoapySDR_logf(SOAPY_SDR_ERROR, "error in writeRfGainSetting() - gain=%d is invalid", value);
+      return;
+   }
+   chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(LNAstate);
+   return;
 }

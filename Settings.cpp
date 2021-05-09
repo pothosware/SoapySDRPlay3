@@ -990,14 +990,20 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     SoapySDRPlay *non_const_this = const_cast<SoapySDRPlay*>(this);
     non_const_this->selectDevice();
 
-    int maxRFGR = getMaxRFGR(device.hwVer);
+    std::string rfGainSettingName = getRfGainSettingName();
+    int rfGainSettingOptionsLength;
+    int rfGainSettingDefault;
+    int *rfGainSettingOptions = getRfGainSettingOptions(rfGainSettingOptionsLength, rfGainSettingDefault);
     SoapySDR::ArgInfo RfGainArg;
     RfGainArg.key = "rfgain_sel";
-    RfGainArg.value = maxRFGR / 2;
-    RfGainArg.name = "RF Gain Select";
-    RfGainArg.description = "RF Gain Select";
-    RfGainArg.type = SoapySDR::ArgInfo::INT;
-    RfGainArg.range = SoapySDR::Range(0, maxRFGR);
+    RfGainArg.value = std::to_string(rfGainSettingDefault);
+    RfGainArg.name = rfGainSettingName;
+    RfGainArg.description = rfGainSettingName;
+    RfGainArg.type = SoapySDR::ArgInfo::STRING;
+    for (int i = 0; i < rfGainSettingOptionsLength; i++)
+    {
+       RfGainArg.options.push_back(std::to_string(rfGainSettingOptions[i]));
+    }
     setArgs.push_back(RfGainArg);
 
     SoapySDR::ArgInfo IQcorrArg;
@@ -1139,7 +1145,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
 
    if (key == "rfgain_sel")
    {
-      chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(stoul(value));
+      writeRfGainSetting(stoi(value));
       sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
    }
    else
@@ -1312,7 +1318,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
 
     if (key == "rfgain_sel")
     {
-       return std::to_string(static_cast<unsigned int>(chParams->tunerParams.gain.LNAstate));
+       return std::to_string(readRfGainSetting());
     }
     else if (key == "iqcorr_ctrl")
     {

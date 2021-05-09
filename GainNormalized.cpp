@@ -170,21 +170,58 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    return SoapySDR::Range(0, 100);
 }
 
-int getMaxRFGR(unsigned char hwVer)
+
+/* RfGainSetting methods */
+std::string SoapySDRPlay::getRfGainSettingName() const
 {
-   switch(hwVer)
-   {
-      case SDRPLAY_RSP1_ID:
-         return 3;
-      case SDRPLAY_RSP1A_ID:
-         return 9;
-      case SDRPLAY_RSP2_ID:
-         return 8;
-      case SDRPLAY_RSPduo_ID:
-         return 9;
-      case SDRPLAY_RSPdx_ID:
-         return 27;
-      default:
-         return 0;
+   return "RF Gain (%)";
+}
+
+int *SoapySDRPlay::getRfGainSettingOptions(int &length, int &defaultValue) const
+{
+   static int options[] = {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 100};
+   length = sizeof(options) / sizeof(options[0]);
+   defaultValue = options[length / 2];
+   return options;
+}
+
+int SoapySDRPlay::readRfGainSetting() const
+{
+   double rfGR = LNAstateGainReductions[chParams->tunerParams.gain.LNAstate] - LNAstateGainReductions[0];
+   double maxRfGR = LNAstateGainReductions[maxLNAstate] - LNAstateGainReductions[0];
+   double normalizedGR = rfGR / maxRfGR;
+   double rfGain = 100 * (1 - normalizedGR);
+
+   // return the closest value among the available setting options
+   int rfGainSettingOptionsLength;
+   int rfGainSettingDefault;
+   int *rfGainSettingOptions = getRfGainSettingOptions(rfGainSettingOptionsLength, rfGainSettingDefault);
+   int rfGainSetting = 0;
+   double minDiff = DBL_MAX;
+   for (int i = 0; i < rfGainSettingOptionsLength; i++) {
+      double diff = abs(rfGain - rfGainSettingOptions[i]);
+      if (diff < minDiff) {
+          rfGainSetting = rfGainSettingOptions[i];
+          minDiff = diff;
+      }
    }
+   return rfGainSetting;
+}
+
+void SoapySDRPlay::writeRfGainSetting(int value)
+{
+   double normalizedGR = 1.0 - (double) value / 100;
+   double rfgRdB = LNAstateGainReductions[0] + normalizedGR * (LNAstateGainReductions[maxLNAstate] - LNAstateGainReductions[0]);
+   // find the closest LNA state
+   int LNAstate = 0;
+   double minDiff = DBL_MAX;
+   for (int i = 0; i <= maxLNAstate; i++) {
+      double diff = abs(rfgRdB - LNAstateGainReductions[i]);
+      if (diff < minDiff) {
+          LNAstate = i;
+          minDiff = diff;
+      }
+   }
+   chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(LNAstate);
+   return;
 }
