@@ -142,11 +142,13 @@ public:
 
     std::vector<std::string> listGains(const int direction, const size_t channel) const;
 
+#ifndef GAIN_MODE_IF_AGC_AS_SETTING
     bool hasGainMode(const int direction, const size_t channel) const;
 
     void setGainMode(const int direction, const size_t channel, const bool automatic);
 
     bool getGainMode(const int direction, const size_t channel) const;
+#endif /* !GAIN_MODE_IF_AGC_AS_SETTING */
 
 #ifdef GAIN_MODE_HAS_SET_GAIN
     void setGain(const int direction, const size_t channel, const double value);

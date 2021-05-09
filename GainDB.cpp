@@ -58,6 +58,7 @@ std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size
     return results;
 }
 
+#ifndef GAIN_MODE_IF_AGC_AS_SETTING
 bool SoapySDRPlay::hasGainMode(const int direction, const size_t channel) const
 {
     return true;
@@ -84,6 +85,7 @@ bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
 
     return chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
 }
+#endif /* !GAIN_MODE_IF_AGC_AS_SETTING */
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
 {

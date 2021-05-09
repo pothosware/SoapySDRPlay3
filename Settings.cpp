@@ -1006,6 +1006,16 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     }
     setArgs.push_back(RfGainArg);
 
+#ifdef GAIN_MODE_IF_AGC_AS_SETTING
+    SoapySDR::ArgInfo IfAGCArg;
+    IfAGCArg.key = "ifagc_ctrl";
+    IfAGCArg.value = "false";
+    IfAGCArg.name = "IF AGC Enable";
+    IfAGCArg.description = "IF Automatic Gain Control Enable";
+    IfAGCArg.type = SoapySDR::ArgInfo::BOOL;
+    setArgs.push_back(IfAGCArg);
+#endif /* GAIN_MODE_IF_AGC_AS_SETTING */
+
     SoapySDR::ArgInfo IQcorrArg;
     IQcorrArg.key = "iqcorr_ctrl";
     IQcorrArg.value = "true";
@@ -1148,8 +1158,18 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       writeRfGainSetting(stoi(value));
       sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
    }
-   else
-   if (key == "iqcorr_ctrl")
+#ifdef GAIN_MODE_IF_AGC_AS_SETTING
+   else if (key == "ifagc_ctrl")
+   {
+      if (value == "false") chParams->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
+      else                  chParams->ctrlParams.agc.enable = sdrplay_api_AGC_CTRL_EN;
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
+#endif
+   else if (key == "iqcorr_ctrl")
    {
       if (value == "false") chParams->ctrlParams.dcOffset.IQenable = 0;
       else                  chParams->ctrlParams.dcOffset.IQenable = 1;
@@ -1320,6 +1340,13 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     {
        return std::to_string(readRfGainSetting());
     }
+#ifdef GAIN_MODE_IF_AGC_AS_SETTING
+    else if (key == "ifagc_ctrl")
+    {
+       if (chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE) return "false";
+       else                                                            return "true";
+    }
+#endif
     else if (key == "iqcorr_ctrl")
     {
        if (chParams->ctrlParams.dcOffset.IQenable == 0) return "false";
