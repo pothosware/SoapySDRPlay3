@@ -79,6 +79,36 @@ bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
     return chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
 }
 
+#if GAIN_MODE_LEGACY_GENERIC_GAIN == 1
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+{
+   int rfGR = (int) value / 100;
+   int ifGR = (int) value % 100;
+   setGain(direction, channel, "RFGR", rfGR);
+   if (ifGR == 0) {
+      setGainMode(direction, channel, true);
+   }
+   else
+   {
+      setGain(direction, channel, "IFGR", ifGR);
+   }
+}
+#elif GAIN_MODE_LEGACY_GENERIC_GAIN == 2
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+{
+   int rfGR = (int) value;
+   int ifGR = (int) (100 * (value - rfGR + 0.00001));
+   setGain(direction, channel, "RFGR", rfGR);
+   if (ifGR == 0) {
+      setGainMode(direction, channel, true);
+   }
+   else
+   {
+      setGain(direction, channel, "IFGR", ifGR);
+   }
+}
+#endif /* GAIN_MODE_LEGACY_GENERIC_GAIN */
+
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
@@ -107,6 +137,22 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
       sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
    }
 }
+
+#if GAIN_MODE_LEGACY_GENERIC_GAIN == 1
+double SoapySDRPlay::getGain(const int direction, const size_t channel) const
+{
+   double rfGR = getGain(direction, channel, "RFGR");
+   double ifGR = getGain(direction, channel, "IFGR");
+   return rfGR * 100 + ifGR;
+}
+#elif GAIN_MODE_LEGACY_GENERIC_GAIN == 2
+double SoapySDRPlay::getGain(const int direction, const size_t channel) const
+{
+   double rfGR = getGain(direction, channel, "RFGR");
+   double ifGR = getGain(direction, channel, "IFGR");
+   return rfGR + ifGR / 100.0;
+}
+#endif
 
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
 {
