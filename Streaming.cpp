@@ -85,6 +85,8 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq, unsigned int numSamples,
     if (stream->count == numBuffers)
     {
         stream->overflowEvent = true;
+        time_t now = time(0);
+        SoapySDR_logf(SOAPY_SDR_WARNING, "%.24s - overflow #1", ctime(&now));
         return;
     }
 
@@ -99,6 +101,8 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq, unsigned int numSamples,
        if (stream->count == numBuffers && (size_t) spaceReqd > buff.capacity() - buff.size())
        {
            stream->overflowEvent = true;
+           time_t now = time(0);
+           SoapySDR_logf(SOAPY_SDR_WARNING, "%.24s - overflow #2", ctime(&now));
            return;
        }
 
