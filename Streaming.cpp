@@ -25,6 +25,8 @@
  */
 
 #include "SoapySDRPlay.hpp"
+// UINT_MAX used in sample gaps check
+#include <climits>
 
 std::vector<std::string> SoapySDRPlay::getStreamFormats(const int direction, const size_t channel) const
 {
@@ -56,6 +58,24 @@ SoapySDR::ArgInfoList SoapySDRPlay::getStreamArgsInfo(const int direction, const
 static void _rx_callback_A(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
                            unsigned int numSamples, unsigned int reset, void *cbContext)
 {
+    // check for gaps in the sample sequence
+    static unsigned int next_sample_num = 0;
+    unsigned int first_sample_num = params->firstSampleNum;
+    if (next_sample_num != 0 && next_sample_num != first_sample_num) {
+        unsigned int sample_num_gap;
+        if (next_sample_num < first_sample_num) {
+            sample_num_gap = first_sample_num - next_sample_num;
+        } else {
+            sample_num_gap = UINT_MAX - (first_sample_num - next_sample_num) + 1;
+        }
+        time_t now = time(0);
+        SoapySDR_logf(SOAPY_SDR_WARNING, "%.24s - sample num gap in stream: %u [%u:%u] -> %u+%u",
+                ctime(&now), next_sample_num, first_sample_num,
+                sample_num_gap / numSamples, sample_num_gap % numSamples);
+    }
+    next_sample_num = first_sample_num + numSamples;
+    // end of check for gaps in the sample sequence
+
     SoapySDRPlay *self = (SoapySDRPlay *)cbContext;
     return self->rx_callback(xi, xq, numSamples, self->_streams[0]);
 }
@@ -498,6 +518,8 @@ int SoapySDRPlay::acquireReadBuffer(SoapySDR::Stream *stream,
         else
         {
            SoapySDR_log(SOAPY_SDR_SSI, "O");
+           time_t now = time(0);
+           SoapySDR_logf(SOAPY_SDR_WARNING, "%.24s - returning SOAPY_SDR_OVERFLOW", ctime(&now));
            return SOAPY_SDR_OVERFLOW;
         }
     }
