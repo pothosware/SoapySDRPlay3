@@ -218,7 +218,7 @@ public:
      ******************************************************************/
 
     class SoapySDRPlayStream;
-    void rx_callback(short *xi, short *xq, unsigned int numSamples, SoapySDRPlayStream *stream);
+    void rx_callback(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params, unsigned int numSamples, SoapySDRPlayStream *stream);
 
     void ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner, sdrplay_api_EventParamsT *params);
 
@@ -293,6 +293,12 @@ private:
     const int uninitRetryDelay = 10;   // 10 seconds before trying uninit again 
 
     static std::unordered_map<std::string, sdrplay_api_DeviceT*> selectedRSPDevices;
+
+    // RX callback reporting changes to gain reduction, frequency, sample rate
+    int gr_changed;
+    int rf_changed;
+    int fs_changed;
+    const int updateTimeout = 500;   // 500ms timeout for updates
 
 public:
 
