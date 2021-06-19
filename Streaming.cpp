@@ -25,6 +25,7 @@
  */
 
 #include "SoapySDRPlay.hpp"
+#include <iostream>
 
 std::vector<std::string> SoapySDRPlay::getStreamFormats(const int direction, const size_t channel) const
 {
@@ -57,14 +58,14 @@ static void _rx_callback_A(short *xi, short *xq, sdrplay_api_StreamCbParamsT *pa
                            unsigned int numSamples, unsigned int reset, void *cbContext)
 {
     SoapySDRPlay *self = (SoapySDRPlay *)cbContext;
-    return self->rx_callback(xi, xq, numSamples, self->_streams[0]);
+    return self->rx_callback(xi, xq, params, numSamples, self->_streams[0]);
 }
 
 static void _rx_callback_B(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
                            unsigned int numSamples, unsigned int reset, void *cbContext)
 {
     SoapySDRPlay *self = (SoapySDRPlay *)cbContext;
-    return self->rx_callback(xi, xq, numSamples, self->_streams[1]);
+    return self->rx_callback(xi, xq, params, numSamples, self->_streams[1]);
 }
 
 static void _ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
@@ -74,13 +75,28 @@ static void _ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tu
     return self->ev_callback(eventId, tuner, params);
 }
 
-void SoapySDRPlay::rx_callback(short *xi, short *xq, unsigned int numSamples,
+void SoapySDRPlay::rx_callback(short *xi, short *xq,
+                               sdrplay_api_StreamCbParamsT *params,
+                               unsigned int numSamples,
                                SoapySDRPlayStream *stream)
 {
     if (stream == 0) {
         return;
     }
     std::lock_guard<std::mutex> lock(stream->mutex);
+
+    if (gr_changed == 0 && params->grChanged != 0)
+    {
+        gr_changed = params->grChanged;
+    }
+    if (rf_changed == 0 && params->rfChanged != 0)
+    {
+        rf_changed = params->rfChanged;
+    }
+    if (fs_changed == 0 && params->fsChanged != 0)
+    {
+        fs_changed = params->fsChanged;
+    }
 
     if (stream->count == numBuffers)
     {
