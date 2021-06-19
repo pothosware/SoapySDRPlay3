@@ -503,7 +503,16 @@ void SoapySDRPlay::setFrequency(const int direction,
          chParams->tunerParams.rfFreq.rfHz = (uint32_t)frequency;
          if (streamActive)
          {
+            rf_changed = 0;
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
+            for (int i = 0; i < updateTimeout && rf_changed == 0; ++i)
+            {
+               std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            if (rf_changed == 0)
+            {
+               SoapySDR_log(SOAPY_SDR_WARNING, "RF center frequency update timeout.");
+            }
          }
 #ifdef GAIN_MODE_USE_RF_GAIN_TABLES
          (this->*updateLNAstateGainReductions)();
@@ -611,10 +620,12 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
        sdrplay_api_Bw_MHzT bwType = getBwEnumForRate(output_sample_rate);
 
        sdrplay_api_ReasonForUpdateT reasonForUpdate = sdrplay_api_Update_None;
+       bool waitForUpdate = false;
        if (deviceParams->devParams && input_sample_rate != deviceParams->devParams->fsFreq.fsHz)
        {
           deviceParams->devParams->fsFreq.fsHz = input_sample_rate;
           reasonForUpdate = (sdrplay_api_ReasonForUpdateT)(reasonForUpdate | sdrplay_api_Update_Dev_Fs);
+          waitForUpdate = true;
        }
        if (ifType != chParams->tunerParams.ifType)
        {
@@ -632,6 +643,7 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
               chParams->ctrlParams.decimation.wideBandSignal = 0;
           }
           reasonForUpdate = (sdrplay_api_ReasonForUpdateT)(reasonForUpdate | sdrplay_api_Update_Ctrl_Decimation);
+          waitForUpdate = true;
        }
        if (bwType != chParams->tunerParams.bwType)
        {
@@ -647,7 +659,19 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
              // beware that when the fs change crosses the boundary between
              // 2,685,312 and 2,685,313 the rx_callbacks stop for some
              // reason
+             fs_changed = 0;
              sdrplay_api_Update(device.dev, device.tuner, reasonForUpdate, sdrplay_api_Update_Ext1_None);
+             if (waitForUpdate)
+             {
+                for (int i = 0; i < updateTimeout && fs_changed == 0; ++i)
+                {
+                   std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                if (fs_changed == 0)
+                {
+                   SoapySDR_log(SOAPY_SDR_WARNING, "Sample rate/decimation update timeout.");
+                }
+             }
           }
        }
     }
@@ -1156,7 +1180,19 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    if (key == "rfgain_sel")
    {
       writeRfGainSetting(stoi(value));
-      sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+      if (streamActive)
+      {
+         gr_changed = 0;
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+         for (int i = 0; i < updateTimeout && gr_changed == 0; ++i)
+         {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+         }
+         if (gr_changed == 0)
+         {
+            SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
+         }
+      }
    }
 #ifdef GAIN_MODE_IF_AGC_AS_SETTING
    else if (key == "ifagc_ctrl")

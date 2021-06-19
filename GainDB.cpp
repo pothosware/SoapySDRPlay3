@@ -157,7 +157,16 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    }
    if (doUpdate && streamActive)
    {
+      gr_changed = 0;
       sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+      for (int i = 0; i < updateTimeout && gr_changed == 0; ++i)
+      {
+         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+      if (gr_changed == 0)
+      {
+         SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
+      }
    }
 }
 
