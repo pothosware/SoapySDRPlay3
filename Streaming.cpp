@@ -93,8 +93,6 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq,
     {
         rf_changed = params->rfChanged;
     }
-// fv
-if (params->fsChanged) std::cerr << "fsChanged=" << params->fsChanged << std::endl;
     if (fs_changed == 0 && params->fsChanged != 0)
     {
         fs_changed = params->fsChanged;
