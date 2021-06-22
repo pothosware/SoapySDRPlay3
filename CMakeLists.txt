@@ -1,7 +1,7 @@
 ########################################################################
 # Build Soapy SDR support module for SDRplay (API version 3)
 ########################################################################
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 2.8.12)
 project(SoapySDRPlay CXX)
 
 find_package(SoapySDR "0.4.0" NO_MODULE REQUIRED)
