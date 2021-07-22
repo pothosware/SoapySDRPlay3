@@ -300,6 +300,8 @@ private:
     int fs_changed;
     const int updateTimeout = 500;   // 500ms timeout for updates
 
+    bool force_zif;
+
 public:
 
    /*******************************************************************

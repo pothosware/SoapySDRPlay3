@@ -815,6 +815,22 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 
 double SoapySDRPlay::getInputSampleRateAndDecimation(uint32_t output_sample_rate, unsigned int *decM, unsigned int *decEnable, sdrplay_api_If_kHzT *ifType) const
 {
+    if (force_zif)
+    {
+        *ifType = sdrplay_api_IF_Zero;
+        for (*decM = 1; *decM <= 32; *decM *= 2)
+        {
+            double input_sample_rate = output_sample_rate / *decM;
+            if (input_sample_rate >= 2000000)
+            {
+                *decEnable = *decM > 1;
+                return input_sample_rate;
+            }
+        }
+        SoapySDR_logf(SOAPY_SDR_WARNING, "Invalid sample rate: %lf", output_sample_rate);
+        return -1;
+    }
+
     sdrplay_api_If_kHzT lif = sdrplay_api_IF_1_620;
     double lif_input_sample_rate = 6000000;
     if (device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoSampleFreq == 8000000)
@@ -1521,6 +1537,26 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
          }
       }
    }
+   else if (key == "force_zif")
+   {
+      if (value == "true" || value == "1" || value == "yes")
+      {
+         if (device.hwVer == SDRPLAY_RSPduo_ID &&
+             (device.rspDuoMode == sdrplay_api_RspDuoMode_Dual_Tuner ||
+              device.rspDuoMode == sdrplay_api_RspDuoMode_Master ||
+              device.rspDuoMode == sdrplay_api_RspDuoMode_Slave)) {
+            SoapySDR_log(SOAPY_SDR_WARNING, "Cannot set ZIF while in Dual Tuner/Master/Slave mode.");
+         }
+         else
+         {
+            force_zif = true;
+         }
+      }
+      else
+      {
+         force_zif = false;
+      }
+   }
 }
 
 std::string SoapySDRPlay::readSetting(const std::string &key) const
@@ -1595,6 +1631,11 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        else if (device.hwVer == SDRPLAY_RSPdx_ID) dabNotchEn = deviceParams->devParams->rspDxParams.rfDabNotchEnable;
        if (dabNotchEn == 0) return "false";
        else                 return "true";
+    }
+    else if (key == "force_zif")
+    {
+       if (force_zif) return "true";
+       else           return "false";
     }
 
     // SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());
