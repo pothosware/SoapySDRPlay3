@@ -43,7 +43,7 @@ std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
 
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
-    if (args.count("serial") == 0) throw std::runtime_error("no sdrplay device found");
+    if (args.count("serial") == 0) throw std::runtime_error("no available RSP devices found");
 
     selectDevice(args.at("serial"),
                  args.count("mode") ? args.at("mode") : "",
