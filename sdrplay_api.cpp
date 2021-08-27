@@ -47,6 +47,7 @@ SoapySDRPlay::sdrplay_api::sdrplay_api()
     }
     if (ver != SDRPLAY_API_VERSION) {
         SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api version: '%.3f' does not equal build version: '%.3f'", ver, SDRPLAY_API_VERSION);
+        SoapySDR_logf(SOAPY_SDR_ERROR, "Please rebuild the SoapySDRPlay module using SDRplay API version %.3f.", ver);
         sdrplay_api_Close();
         throw std::runtime_error("API version mismatch");
     }
