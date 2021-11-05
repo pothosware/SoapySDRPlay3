@@ -489,6 +489,10 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
          doUpdate = true;
       }
    }
+   else if (name == "IFGR")
+   {
+      SoapySDR_log(SOAPY_SDR_WARNING, "Not updating IFGR gain because AGC is enabled");
+   }
    else if (name == "RFGR")
    {
       if (chParams->tunerParams.gain.LNAstate != (int)value) {
