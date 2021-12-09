@@ -1756,6 +1756,7 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     hwVer = device.hwVer;
 
     SoapySDR_logf(SOAPY_SDR_INFO, "devIdx: %d", devIdx);
+    SoapySDR_logf(SOAPY_SDR_INFO, "SerNo: %s", device.SerNo);
     SoapySDR_logf(SOAPY_SDR_INFO, "hwVer: %d", device.hwVer);
 
     if (hwVer == SDRPLAY_RSPduo_ID && rspDuoMode != sdrplay_api_RspDuoMode_Slave)
