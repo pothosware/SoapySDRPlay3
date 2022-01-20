@@ -1686,18 +1686,11 @@ void SoapySDRPlay::selectDevice(const std::string &serial,
 
 void SoapySDRPlay::selectDevice()
 {
-    if (selectedRSPDevices.count(rspDeviceId))
-    {
-        sdrplay_api_DeviceT *currDevice = selectedRSPDevices.at(rspDeviceId);
-        if (currDevice == &device) {
-            // nothing to do - we are good
-            return;
-        }
+    if (selectedRSPDevices.count(rspDeviceId) > 0 &&
+        selectedRSPDevices.at(rspDeviceId) != &device) {
+        selectDevice(device.tuner, device.rspDuoMode, device.rspDuoSampleFreq,
+                     deviceParams);
     }
-
-    selectDevice(device.tuner, device.rspDuoMode, device.rspDuoSampleFreq,
-                 deviceParams);
-
     return;
 }
 
@@ -1750,7 +1743,10 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     {
         if (rspDevs[i].SerNo == serNo) devIdx = i;
     }
-    if (devIdx == SDRPLAY_MAX_DEVICES) throw std::runtime_error("no sdrplay device matches");
+    if (devIdx == SDRPLAY_MAX_DEVICES) {
+        SoapySDR_log(SOAPY_SDR_ERROR, "no sdrplay device matches");
+        throw std::runtime_error("no sdrplay device matches");
+    }
 
     device = rspDevs[devIdx];
     hwVer = device.hwVer;
