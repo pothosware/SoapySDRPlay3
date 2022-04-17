@@ -1,3 +1,10 @@
+Release 0.4.0 (2022-04-17)
+==========================
+
+- Device selection by serial number
+- Fix concurrency bugs with SoapySDR remote
+- Fix several problems with RSPduo modes
+
 Release 0.3.0 (pending)
 ==========================
 
