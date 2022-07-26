@@ -184,6 +184,13 @@ void SoapySDRPlay::ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSele
             // OVERLOAD CORRECTED
         }
     }
+    else if (eventId == sdrplay_api_DeviceRemoved)
+    {
+        // Display error saying that the device has been removed and force
+        // the application to close
+        SoapySDR_log(SOAPY_SDR_ERROR, "device has been removed. Aborting.");
+        throw std::runtime_error("device has been removed. Aborting.");
+    }
     else if (eventId == sdrplay_api_RspDuoModeChange)
     {
         if (params->rspDuoModeParams.modeChangeType == sdrplay_api_MasterDllDisappeared)
@@ -408,7 +415,7 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
     if (_streams[sdrplay_stream->channel] == 0)
     {
         //throw std::runtime_error("readStream stream not activated");
-        return SOAPY_SDR_STREAM_ERROR;
+        return SOAPY_SDR_NOT_SUPPORTED;
     }
 
     // fv
