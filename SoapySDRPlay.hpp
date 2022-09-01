@@ -160,15 +160,24 @@ public:
 
     void setFrequency(const int direction,
                       const size_t channel,
+                      const double frequency,
+                      const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
+
+    void setFrequency(const int direction,
+                      const size_t channel,
                       const std::string &name,
                       const double frequency,
                       const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
+
+    double getFrequency(const int direction, const size_t channel) const;
 
     double getFrequency(const int direction, const size_t channel, const std::string &name) const;
 
     SoapySDR::RangeList getBandwidthRange(const int direction, const size_t channel) const;
 
     std::vector<std::string> listFrequencies(const int direction, const size_t channel) const;
+
+    SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel) const;
 
     SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel, const std::string &name) const;
 

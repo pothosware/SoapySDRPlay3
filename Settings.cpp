@@ -573,6 +573,14 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
 
 void SoapySDRPlay::setFrequency(const int direction,
                                  const size_t channel,
+                                 const double frequency,
+                                 const SoapySDR::Kwargs &args)
+{
+    setFrequency(direction, channel, "RF", frequency, args);
+}
+
+void SoapySDRPlay::setFrequency(const int direction,
+                                 const size_t channel,
                                  const std::string &name,
                                  const double frequency,
                                  const SoapySDR::Kwargs &args)
@@ -614,6 +622,11 @@ void SoapySDRPlay::setFrequency(const int direction,
    }
 }
 
+double SoapySDRPlay::getFrequency(const int direction, const size_t channel) const
+{
+    return getFrequency(direction, channel, "RF");
+}
+
 double SoapySDRPlay::getFrequency(const int direction, const size_t channel, const std::string &name) const
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
@@ -641,6 +654,11 @@ std::vector<std::string> SoapySDRPlay::listFrequencies(const int direction, cons
     names.push_back("RF");
     names.push_back("CORR");
     return names;
+}
+
+SoapySDR::RangeList SoapySDRPlay::getFrequencyRange(const int direction, const size_t channel) const
+{
+    return getFrequencyRange(direction, channel, "RF");
 }
 
 SoapySDR::RangeList SoapySDRPlay::getFrequencyRange(const int direction, const size_t channel,  const std::string &name) const
