@@ -49,10 +49,6 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
                  args.count("mode") ? args.at("mode") : "",
                  args.count("antenna") ? args.at("antenna") : "");
 
-    // set default gain behavior
-    gain_behavior = args.count("gain_behavior") && args.at("gain_behavior") == "ifgr"?
-        GAIN_IFGR_ONLY : GAIN_DEFAULT;
-
     // keep all the default settings:
     // - rf: 200MHz
     // - fs: 2MHz
@@ -1250,6 +1246,14 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     }
 #endif
 
+    SoapySDR::ArgInfo DefGainArg;
+    DefGainArg.key = "default_gain";
+    DefGainArg.value = "legacy";
+    DefGainArg.name = "Default Gain Behavior";
+    DefGainArg.description = "Default Gain Behavior";
+    DefGainArg.type = SoapySDR::ArgInfo::STRING;
+    setArgs.push_back(DefGainArg);
+
     SoapySDR::ArgInfo IQcorrArg;
     IQcorrArg.key = "iqcorr_ctrl";
     IQcorrArg.value = "true";
@@ -1410,7 +1414,11 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    }
    else
 #endif
-   if (key == "iqcorr_ctrl")
+   if (key == "default_gain")
+   {
+      gain_behavior = value == "ifgr"? GAIN_IFGR_ONLY : GAIN_DEFAULT;
+   }
+   else if (key == "iqcorr_ctrl")
    {
       if (value == "false") chParams->ctrlParams.dcOffset.IQenable = 0;
       else                  chParams->ctrlParams.dcOffset.IQenable = 1;
@@ -1584,7 +1592,11 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     }
     else
 #endif
-    if (key == "iqcorr_ctrl")
+    if (key == "default_gain")
+    {
+       return gain_behavior == GAIN_IFGR_ONLY? "ifgr" : "legacy";
+    }
+    else if (key == "iqcorr_ctrl")
     {
        if (chParams->ctrlParams.dcOffset.IQenable == 0) return "false";
        else                                             return "true";
