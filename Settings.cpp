@@ -49,6 +49,10 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
                  args.count("mode") ? args.at("mode") : "",
                  args.count("antenna") ? args.at("antenna") : "");
 
+    // set default gain behavior
+    gain_behavior = args.count("gain_behavior") && args.at("gain_behavior") == "ifgr"?
+        GAIN_IFGR_ONLY : GAIN_DEFAULT;
+
     // keep all the default settings:
     // - rf: 200MHz
     // - fs: 2MHz
@@ -474,6 +478,19 @@ bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
     return chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
 }
 
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+{
+    switch(gain_behavior)
+    {
+        case GAIN_IFGR_ONLY:
+            setGain(direction, channel, "IFGR", value);
+            break;
+        default:
+            SoapySDR::Device::setGain(direction, channel, value);
+            break;
+    }
+}
+
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
@@ -522,6 +539,19 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    }
 }
 
+double SoapySDRPlay::getGain(const int direction, const size_t channel) const
+{
+    switch(gain_behavior)
+    {
+        case GAIN_IFGR_ONLY:
+            return getGain(direction, channel, "IFGR");
+            break;
+        default:
+            return SoapySDR::Device::getGain(direction, channel);
+            break;
+    }
+}
+
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
@@ -536,6 +566,19 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
    }
 
    return 0;
+}
+
+SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
+{
+    switch(gain_behavior)
+    {
+        case GAIN_IFGR_ONLY:
+            return getGainRange(direction, channel, "IFGR");
+            break;
+        default:
+            return SoapySDR::Device::getGainRange(direction, channel);
+            break;
+    }
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const

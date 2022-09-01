@@ -45,6 +45,9 @@
 #define DEFAULT_NUM_BUFFERS       (8)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
 
+#define GAIN_DEFAULT              (0)
+#define GAIN_IFGR_ONLY            (1)
+
 std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
 
 class SoapySDRPlay: public SoapySDR::Device
@@ -148,9 +151,15 @@ public:
 
     bool getGainMode(const int direction, const size_t channel) const;
 
+    void setGain(const int direction, const size_t channel, const double value);
+
     void setGain(const int direction, const size_t channel, const std::string &name, const double value);
 
+    double getGain(const int direction, const size_t channel) const;
+
     double getGain(const int direction, const size_t channel, const std::string &name) const;
+
+    SoapySDR::Range getGainRange(const int direction, const size_t channel) const;
 
     SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
 
@@ -283,6 +292,9 @@ private:
     const size_t numBuffers = DEFAULT_NUM_BUFFERS;
     const unsigned int bufferElems = DEFAULT_BUFFER_LENGTH;
     const int elementsPerSample = DEFAULT_ELEMS_PER_SAMPLE;
+
+    //default gain control behavior
+    int gain_behavior = GAIN_DEFAULT;
 
     std::atomic_uint shortsPerWord;
  
