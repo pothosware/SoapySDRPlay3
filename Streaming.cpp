@@ -312,7 +312,7 @@ void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
                 break;
             }
             SoapySDR_logf(SOAPY_SDR_WARNING, "Please close RSPduo slave device first. Trying again in %d seconds", uninitRetryDelay);
-            std::this_thread::sleep_for(std::chrono::seconds(uninitRetryDelay));
+            waitForDevice(uninitRetryDelay*1000);
         }
         streamActive = false;
     }
