@@ -481,6 +481,7 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const doub
         case GAIN_IFGR_ONLY:
             setGain(direction, channel, "IFGR", value);
             break;
+        case GAIN_DEFAULT:
         default:
             SoapySDR::Device::setGain(direction, channel, value);
             break;
@@ -542,6 +543,7 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel) const
         case GAIN_IFGR_ONLY:
             return getGain(direction, channel, "IFGR");
             break;
+        case GAIN_DEFAULT:
         default:
             return SoapySDR::Device::getGain(direction, channel);
             break;
@@ -571,6 +573,7 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
         case GAIN_IFGR_ONLY:
             return getGainRange(direction, channel, "IFGR");
             break;
+        case GAIN_DEFAULT:
         default:
             return SoapySDR::Device::getGainRange(direction, channel);
             break;
@@ -1247,7 +1250,7 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 #endif
 
     SoapySDR::ArgInfo DefGainArg;
-    DefGainArg.key = "default_gain";
+    DefGainArg.key = "gain_behavior";
     DefGainArg.value = "legacy";
     DefGainArg.name = "Default Gain Behavior";
     DefGainArg.description = "Default Gain Behavior";
@@ -1414,7 +1417,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    }
    else
 #endif
-   if (key == "default_gain")
+   if (key == "gain_behavior")
    {
       gain_behavior = value == "ifgr"? GAIN_IFGR_ONLY : GAIN_DEFAULT;
    }
@@ -1592,7 +1595,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     }
     else
 #endif
-    if (key == "default_gain")
+    if (key == "gain_behavior")
     {
        return gain_behavior == GAIN_IFGR_ONLY? "ifgr" : "legacy";
     }

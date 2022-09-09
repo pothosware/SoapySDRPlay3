@@ -294,7 +294,7 @@ private:
     const int elementsPerSample = DEFAULT_ELEMS_PER_SAMPLE;
 
     //default gain control behavior
-    int gain_behavior = GAIN_DEFAULT;
+    int gain_behavior = GAIN_IFGR_ONLY;
 
     std::atomic_uint shortsPerWord;
  
