@@ -476,7 +476,7 @@ bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
+   std::lock_guard <std::mutex> lock(_general_state_mutex);
 
    bool doUpdate = false;
 
@@ -508,12 +508,9 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    {
       gr_changed = 0;
       sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-      for (int i = 0; i < updateTimeout; ++i)
+      for (int i = 0; (i < updateTimeout) && (gr_changed == 0) ; ++i)
       {
-         if (gr_changed != 0) {
-            break;
-         }
-         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+         waitForDevice(1);
       }
       if (gr_changed == 0)
       {
@@ -588,12 +585,9 @@ void SoapySDRPlay::setFrequency(const int direction,
          {
             rf_changed = 0;
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
-            for (int i = 0; i < updateTimeout; ++i)
+            for (int i = 0; (i < updateTimeout) && (rf_changed == 0) ; ++i)
             {
-               if (rf_changed != 0) {
-                  break;
-               }
-               std::this_thread::sleep_for(std::chrono::milliseconds(1));
+               waitForDevice(1);
             }
             if (rf_changed == 0)
             {
@@ -739,12 +733,9 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
              sdrplay_api_Update(device.dev, device.tuner, reasonForUpdate, sdrplay_api_Update_Ext1_None);
              if (waitForUpdate)
              {
-                for (int i = 0; i < updateTimeout; ++i)
+                for (int i = 0; (i < updateTimeout) && (fs_changed == 0) ; ++i)
                 {
-                   if (fs_changed != 0) {
-                      break;
-                   }
-                   std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                   waitForDevice(1);
                 }
                 if (fs_changed == 0)
                 {
@@ -1352,12 +1343,9 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       {
          gr_changed = 0;
          sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-         for (int i = 0; i < updateTimeout; ++i)
+         for (int i = 0; (i < updateTimeout) && (gr_changed == 0) ; ++i)
          {
-            if (gr_changed != 0) {
-               break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            waitForDevice(1);
          }
          if (gr_changed == 0)
          {
@@ -1862,4 +1850,11 @@ void SoapySDRPlay::releaseDevice()
     }
 
     return;
+}
+
+void SoapySDRPlay::waitForDevice(int msec)
+{
+    _general_state_mutex.unlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(msec));
+    _general_state_mutex.lock();
 }
