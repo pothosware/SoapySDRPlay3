@@ -54,6 +54,8 @@ ENDIF()
 SOAPY_SDR_MODULE_UTIL(
     TARGET sdrPlaySupport
     SOURCES
+        GainControls.hpp
+        GainControls.cpp
         SoapySDRPlay.hpp
         Registration.cpp
         sdrplay_api.cpp
