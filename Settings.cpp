@@ -61,6 +61,9 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     // - DC correction: on
     // - IQ balance: on
 
+    // set default gain controls to 'legacy'
+    gain_controls = new GainControlsLegacy(device, chParams);
+
     // process additional device string arguments
     for (std::pair<std::string, std::string> arg : args) {
         // ignore 'driver', 'label', 'mode', 'serial', and 'soapy'
@@ -435,35 +438,30 @@ bool SoapySDRPlay::hasDCOffset(const int direction, const size_t channel) const
  * Gain API
  ******************************************************************/
 
+/* NOTE: all gain controls are now delegated to the user selectable
+ *       GainControls classes:
+ *         - LEGACY
+ *         - DB
+ */
+
 std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
 {
-    //list available gain elements,
-    //the functions below have a "name" parameter
-    std::vector<std::string> results;
-
-    results.push_back("IFGR");
-    results.push_back("RFGR");
-
-    return results;
+    return gain_controls->listGains(direction, channel);
 }
 
 bool SoapySDRPlay::hasGainMode(const int direction, const size_t channel) const
 {
-    return true;
+    return gain_controls->hasGainMode(direction, channel);
 }
 
 void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-    sdrplay_api_AgcControlT agc_control = automatic ? sdrplay_api_AGC_CTRL_EN : sdrplay_api_AGC_DISABLE;
-    if (chParams->ctrlParams.agc.enable != agc_control)
+    bool doUpdate = gain_controls->setGainMode(direction, channel, automatic);
+    if (doUpdate && streamActive)
     {
-        chParams->ctrlParams.agc.enable = agc_control;
-        if (streamActive)
-        {
-            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
-        }
+        sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
     }
 }
 
@@ -471,100 +469,98 @@ bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-    return chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
+    return gain_controls->getGainMode(direction, channel);
+}
+
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+{
+    if (gain_controls->hasGenericGain())
+    {
+        std::lock_guard <std::mutex> lock(_general_state_mutex);
+
+        bool doUpdate = gain_controls->setGain(direction, channel, value);
+        if (doUpdate && streamActive)
+        {
+            gr_changed = 0;
+            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+            for (int i = 0; i < updateTimeout; ++i)
+            {
+                if (gr_changed != 0) {
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            if (gr_changed == 0)
+            {
+                SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
+            }
+        }
+    }
+    else
+    {
+        this->SoapySDR::Device::setGain(direction, channel, value);
+    }
 }
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-   bool doUpdate = false;
+    bool doUpdate = gain_controls->setGain(direction, channel, name, value);
+    if (doUpdate && streamActive)
+    {
+        gr_changed = 0;
+        sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+        for (int i = 0; i < updateTimeout; ++i)
+        {
+            if (gr_changed != 0) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        if (gr_changed == 0)
+        {
+            SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
+        }
+    }
+}
 
-   if (name == "IFGR")
-   {
-      if (chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
-      {
-         //apply the change if the required value is different from gRdB 
-         if (chParams->tunerParams.gain.gRdB != (int)value)
-         {
-            chParams->tunerParams.gain.gRdB = (int)value;
-            doUpdate = true;
-         }
-      }
-      else
-      {
-         SoapySDR_log(SOAPY_SDR_WARNING, "Not updating IFGR gain because AGC is enabled");
-      }
-   }
-   else if (name == "RFGR")
-   {
-      if (chParams->tunerParams.gain.LNAstate != (int)value) {
+double SoapySDRPlay::getGain(const int direction, const size_t channel) const
+{
+    if (gain_controls->hasGenericGain())
+    {
+        std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-          chParams->tunerParams.gain.LNAstate = (int)value;
-          doUpdate = true;
-      }
-   }
-   if ((doUpdate == true) && (streamActive))
-   {
-      gr_changed = 0;
-      sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-      for (int i = 0; i < updateTimeout; ++i)
-      {
-         if (gr_changed != 0) {
-            break;
-         }
-         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-      if (gr_changed == 0)
-      {
-         SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
-      }
-   }
+        return gain_controls->getGain(direction, channel);
+    }
+    else
+    {
+        return this->SoapySDR::Device::getGain(direction, channel);
+    }
 }
 
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-   if (name == "IFGR")
-   {
-       return chParams->tunerParams.gain.gRdB;
-   }
-   else if (name == "RFGR")
-   {
-      return chParams->tunerParams.gain.LNAstate;
-   }
+    return gain_controls->getGain(direction, channel, name);
+}
 
-   return 0;
+SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
+{
+    if (gain_controls->hasGenericGain())
+    {
+        return gain_controls->getGainRange(direction, channel);
+    }
+    else
+    {
+        return this->SoapySDR::Device::getGainRange(direction, channel);
+    }
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
 {
-   if (name == "IFGR")
-   {
-      return SoapySDR::Range(20, 59);
-   }
-   else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSP1_ID))
-   {
-      return SoapySDR::Range(0, 3);
-   }
-   else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSP2_ID))
-   {
-      return SoapySDR::Range(0, 8);
-   }
-   else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSPduo_ID))
-   {
-      return SoapySDR::Range(0, 9);
-   }
-   else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSP1A_ID))
-   {
-      return SoapySDR::Range(0, 9);
-   }
-   else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSPdx_ID))
-   {
-      return SoapySDR::Range(0, 27);
-   }
-    return SoapySDR::Range(20, 59);
+    return gain_controls->getGainRange(direction, channel, name);
 }
 
 /*******************************************************************
@@ -1093,118 +1089,33 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     SoapySDRPlay *non_const_this = const_cast<SoapySDRPlay*>(this);
     non_const_this->selectDevice();
 
+    SoapySDR::ArgInfo GainCtrlModeArg;
+    GainCtrlModeArg.key = "gain_ctrl_mode";
+    GainCtrlModeArg.value = "LEGACY";
+    GainCtrlModeArg.name = "Gain Control Mode";
+    GainCtrlModeArg.description = "Gain Control Mode Selection";
+    GainCtrlModeArg.type = SoapySDR::ArgInfo::STRING;
+    GainCtrlModeArg.options.push_back("LEGACY");
+    GainCtrlModeArg.options.push_back("DB");
+    GainCtrlModeArg.options.push_back("RFATT");
+    GainCtrlModeArg.options.push_back("STEPS");
+    setArgs.push_back(GainCtrlModeArg);
+
 #ifdef RF_GAIN_IN_MENU
-    if (device.hwVer == SDRPLAY_RSP2_ID)
+    std::string rfGainSettingName = gain_controls->getRfGainSettingName();
+    int rfGainSettingDefault;
+    std::vector<int> rfGainSettingOptions = gain_controls->getRfGainSettingOptions(rfGainSettingDefault);
+    SoapySDR::ArgInfo RfGainArg;
+    RfGainArg.key = "rfgain_sel";
+    RfGainArg.value = std::to_string(rfGainSettingDefault);
+    RfGainArg.name = rfGainSettingName;
+    RfGainArg.description = rfGainSettingName;
+    RfGainArg.type = SoapySDR::ArgInfo::STRING;
+    for (int rfGainSettingOption : rfGainSettingOptions)
     {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       setArgs.push_back(RfGainArg);
+       RfGainArg.options.push_back(std::to_string(rfGainSettingOption));
     }
-    else if (device.hwVer == SDRPLAY_RSPduo_ID)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       RfGainArg.options.push_back("9");
-       setArgs.push_back(RfGainArg);
-    }
-    else if (device.hwVer == SDRPLAY_RSP1A_ID)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       RfGainArg.options.push_back("9");
-       setArgs.push_back(RfGainArg);
-    }
-    else if (device.hwVer == SDRPLAY_RSPdx_ID)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       RfGainArg.options.push_back("9");
-       RfGainArg.options.push_back("10");
-       RfGainArg.options.push_back("11");
-       RfGainArg.options.push_back("12");
-       RfGainArg.options.push_back("13");
-       RfGainArg.options.push_back("14");
-       RfGainArg.options.push_back("15");
-       RfGainArg.options.push_back("16");
-       RfGainArg.options.push_back("17");
-       RfGainArg.options.push_back("18");
-       RfGainArg.options.push_back("19");
-       RfGainArg.options.push_back("20");
-       RfGainArg.options.push_back("21");
-       RfGainArg.options.push_back("22");
-       RfGainArg.options.push_back("23");
-       RfGainArg.options.push_back("24");
-       RfGainArg.options.push_back("25");
-       RfGainArg.options.push_back("26");
-       RfGainArg.options.push_back("27");
-       setArgs.push_back(RfGainArg);
-    }
-    else
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "1";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       setArgs.push_back(RfGainArg);
-    }
+    setArgs.push_back(RfGainArg);
 #endif
 
     SoapySDR::ArgInfo IQcorrArg;
@@ -1347,7 +1258,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
 #ifdef RF_GAIN_IN_MENU
    if (key == "rfgain_sel")
    {
-      chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(stoul(value));
+      gain_controls->writeRfGainSetting(stoi(value));
       if (streamActive)
       {
          gr_changed = 0;
@@ -1528,6 +1439,20 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
          }
       }
    }
+   else if (key == "gain_ctrl_mode")
+   {
+      if (value == "legacy" || value == "LEGACY") {
+         gain_controls = new GainControlsLegacy(device, chParams);
+      } else if (value == "db" || value == "DB") {
+         gain_controls = new GainControlsDB(device, deviceParams, chParams);
+      } else if (value == "rfatt" || value == "RFATT") {
+         gain_controls = new GainControlsRFATT(device, deviceParams, chParams);
+      } else if (value == "steps" || value == "STEPS") {
+         gain_controls = new GainControlsSteps(device, chParams);
+      } else {
+         SoapySDR_logf(SOAPY_SDR_WARNING, "Invalid gain_ctrl_mode: %s", value);
+      }
+   }
 }
 
 std::string SoapySDRPlay::readSetting(const std::string &key) const
@@ -1537,7 +1462,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
 #ifdef RF_GAIN_IN_MENU
     if (key == "rfgain_sel")
     {
-       return std::to_string(static_cast<unsigned int>(chParams->tunerParams.gain.LNAstate));
+       return std::to_string(gain_controls->readRfGainSetting());
     }
     else
 #endif

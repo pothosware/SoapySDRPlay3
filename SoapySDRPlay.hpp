@@ -25,6 +25,7 @@
  */
 #pragma once
 
+#include <GainControls.hpp>
 #include <SoapySDR/Device.hpp>
 #include <SoapySDR/Logger.h>
 #include <SoapySDR/Types.h>
@@ -148,9 +149,15 @@ public:
 
     bool getGainMode(const int direction, const size_t channel) const;
 
+    void setGain(const int direction, const size_t channel, const double value);
+
     void setGain(const int direction, const size_t channel, const std::string &name, const double value);
 
+    double getGain(const int direction, const size_t channel) const;
+
     double getGain(const int direction, const size_t channel, const std::string &name) const;
+
+    SoapySDR::Range getGainRange(const int direction, const size_t channel) const;
 
     SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
 
@@ -299,6 +306,8 @@ private:
     int rf_changed;
     int fs_changed;
     const int updateTimeout = 500;   // 500ms timeout for updates
+
+    GainControls *gain_controls;
 
 public:
 
