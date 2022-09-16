@@ -545,7 +545,7 @@ void GainControlsDB::writeRfGainSetting(int value)
 
 
 /* Gain mode with only RF attenuation in dB
- * (IF attenuation is always controlled by AGC)
+ * IF attenuation is always controlled by AGC
  *   - RFATT: RF gain reduction in dB defined as: RFGRdB (function of LNA state)
  *            higher values mean less gain - range: varies
  */
@@ -966,5 +966,156 @@ void GainControlsSteps::getGainStepsRSPdx(std::vector<uint8_t> &lnastates, std::
         lnastates = std::vector<uint8_t>{ 18,18,18,18,18,18,16,15,14,13,11,10, 9, 8, 7, 6, 6, 6, 5, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0 };
         if_gains = std::vector<uint8_t>{ 59,55,52,48,44,40,43,42,41,41,43,42,41,41,40,48,45,41,40,42,42,41,42,39,35,31,27,24,20 };
     }
+    return;
+}
+
+
+/* Gain mode with only IF gain reduction in dB
+ * RF gain reduction is controlled by the 'RF Gain Select' setting
+ *   - IFGR: IF gain reduction in dB
+ *                   higher values mean less gain - range: 20-59
+ */
+
+std::vector<std::string> GainControlsIFGR::listGains(const int direction, const size_t channel) const
+{
+    //list available gain elements,
+    //the functions below have a "name" parameter
+    std::vector<std::string> results;
+
+    results.push_back("IFGR");
+
+    return results;
+}
+
+bool GainControlsIFGR::hasGainMode(const int direction, const size_t channel) const
+{
+    return true;
+}
+
+bool GainControlsIFGR::setGainMode(const int direction, const size_t channel, const bool automatic)
+{
+    bool doUpdate = false;
+
+    sdrplay_api_AgcControlT agc_control = automatic ? sdrplay_api_AGC_50HZ : sdrplay_api_AGC_DISABLE;
+    if (chParams->ctrlParams.agc.enable != agc_control)
+    {
+        chParams->ctrlParams.agc.enable = agc_control;
+        doUpdate = true;
+    }
+    return doUpdate;
+}
+
+bool GainControlsIFGR::getGainMode(const int direction, const size_t channel) const
+{
+    return chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
+}
+
+bool GainControlsIFGR::setGain(const int direction, const size_t channel, const double value)
+{
+    return setGain(direction, channel, "IFGR", value);
+}
+
+bool GainControlsIFGR::setGain(const int direction, const size_t channel, const std::string &name, const double value)
+{
+    bool doUpdate = false;
+
+    if (name == "IFGR")
+    {
+        if (chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
+        {
+            // apply the change if the required value is different from gRdB
+            if (chParams->tunerParams.gain.gRdB != (int)value)
+            {
+                chParams->tunerParams.gain.gRdB = (int)value;
+                doUpdate = true;
+            }
+        }
+        else
+        {
+            SoapySDR_log(SOAPY_SDR_WARNING, "Not updating IFGR gain because AGC is enabled");
+        }
+    }
+    return doUpdate;
+}
+
+double GainControlsIFGR::getGain(const int direction, const size_t channel) const
+{
+    return getGain(direction, channel, "IFGR");
+}
+
+double GainControlsIFGR::getGain(const int direction, const size_t channel, const std::string &name) const
+{
+    if (name == "IFGR")
+    {
+        return chParams->tunerParams.gain.gRdB;
+    }
+
+    return 0;
+}
+
+SoapySDR::Range GainControlsIFGR::getGainRange(const int direction, const size_t channel) const
+{
+    return getGainRange(direction, channel, "IFGR");
+}
+
+SoapySDR::Range GainControlsIFGR::getGainRange(const int direction, const size_t channel, const std::string &name) const
+{
+    if (name == "IFGR")
+    {
+        return SoapySDR::Range(sdrplay_api_NORMAL_MIN_GR, MAX_BB_GR);
+    }
+    return SoapySDR::Range(0, 0);
+}
+
+std::string GainControlsIFGR::getRfGainSettingName() const
+{
+    return "RF Gain Select";
+}
+
+std::vector<int> GainControlsIFGR::getRfGainSettingOptions(int &defaultValue) const
+{
+    std::vector<int> options;
+    switch(device.hwVer)
+    {
+        case SDRPLAY_RSP1_ID:
+            options.resize(3+1);
+            std::iota(options.begin(), options.end(), 0);
+            defaultValue = options[1];
+            break;
+        case SDRPLAY_RSP1A_ID:
+            options.resize(9+1);
+            std::iota(options.begin(), options.end(), 0);
+            defaultValue = options[4];
+            break;
+        case SDRPLAY_RSP2_ID:
+            options.resize(8+1);
+            std::iota(options.begin(), options.end(), 0);
+            defaultValue = options[4];
+            break;
+        case SDRPLAY_RSPduo_ID:
+            options.resize(9+1);
+            std::iota(options.begin(), options.end(), 0);
+            defaultValue = options[4];
+            break;
+        case SDRPLAY_RSPdx_ID:
+            options.resize(27+1);
+            std::iota(options.begin(), options.end(), 0);
+            defaultValue = options[4];
+            break;
+        default:
+            defaultValue = -1;
+            break;
+    }
+    return options;
+}
+
+int GainControlsIFGR::readRfGainSetting() const
+{
+    return static_cast<int>(chParams->tunerParams.gain.LNAstate);
+}
+
+void GainControlsIFGR::writeRfGainSetting(int value)
+{
+    chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(value);
     return;
 }

@@ -442,6 +442,9 @@ bool SoapySDRPlay::hasDCOffset(const int direction, const size_t channel) const
  *       GainControls classes:
  *         - LEGACY
  *         - DB
+ *         - RFATT
+ *         - STEPS
+ *         - IFGR
  */
 
 std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
@@ -1099,6 +1102,7 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     GainCtrlModeArg.options.push_back("DB");
     GainCtrlModeArg.options.push_back("RFATT");
     GainCtrlModeArg.options.push_back("STEPS");
+    GainCtrlModeArg.options.push_back("IFGR");
     setArgs.push_back(GainCtrlModeArg);
 
 #ifdef RF_GAIN_IN_MENU
@@ -1449,6 +1453,8 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
          gain_controls = new GainControlsRFATT(device, deviceParams, chParams);
       } else if (value == "steps" || value == "STEPS") {
          gain_controls = new GainControlsSteps(device, chParams);
+      } else if (value == "ifgr" || value == "IFGR") {
+         gain_controls = new GainControlsIFGR(device, chParams);
       } else {
          SoapySDR_logf(SOAPY_SDR_WARNING, "Invalid gain_ctrl_mode: %s", value);
       }

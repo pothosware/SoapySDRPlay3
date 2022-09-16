@@ -325,3 +325,44 @@ private:
     static constexpr int GAIN_STEPS = 29;
     int step;
 };
+
+
+// IFGR
+class GainControlsIFGR: public GainControls
+{
+public:
+    GainControlsIFGR(sdrplay_api_DeviceT &device,
+                     sdrplay_api_RxChannelParamsT *chParams) :
+        GainControls(device, chParams) {}
+
+    std::vector<std::string> listGains(const int direction, const size_t channel) const override;
+
+    bool hasGainMode(const int direction, const size_t channel) const override;
+
+    bool setGainMode(const int direction, const size_t channel, const bool automatic) override;
+
+    bool getGainMode(const int direction, const size_t channel) const override;
+
+    bool hasGenericGain() const override { return true; }
+
+    bool setGain(const int direction, const size_t channel, const double value) override;
+
+    bool setGain(const int direction, const size_t channel, const std::string &name, const double value) override;
+
+    double getGain(const int direction, const size_t channel) const override;
+
+    double getGain(const int direction, const size_t channel, const std::string &name) const override;
+
+    SoapySDR::Range getGainRange(const int direction, const size_t channel) const override;
+
+    SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const override;
+
+    /* RfGainSetting methods */
+    std::string getRfGainSettingName() const override;
+
+    std::vector<int> getRfGainSettingOptions(int &defaultValue) const override;
+
+    int readRfGainSetting() const override;
+
+    void writeRfGainSetting(int value) override;
+};
