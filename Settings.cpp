@@ -85,6 +85,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
     streamActive = false;
 
+    device_unavailable = false;
+
     cacheKey = serNo;
     if (hwVer == SDRPLAY_RSPduo_ID) cacheKey += "@" + args.at("mode");
     SoapySDRPlay_getClaimedSerials().insert(cacheKey);

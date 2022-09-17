@@ -186,19 +186,19 @@ void SoapySDRPlay::ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSele
     }
     else if (eventId == sdrplay_api_DeviceRemoved)
     {
-        // Display error saying that the device has been removed and force
-        // the application to close
-        SoapySDR_log(SOAPY_SDR_ERROR, "device has been removed. Aborting.");
-        throw std::runtime_error("device has been removed. Aborting.");
+        // Notify readStream() that the device has been removed so that
+        // the application can be closed gracefully
+        SoapySDR_log(SOAPY_SDR_ERROR, "Device has been removed. Stopping.");
+        device_unavailable = true;
     }
     else if (eventId == sdrplay_api_RspDuoModeChange)
     {
         if (params->rspDuoModeParams.modeChangeType == sdrplay_api_MasterDllDisappeared)
         {
-            // Display error saying that the master stream has been removed
-            // before the slave stream and force the slave application to close
-            SoapySDR_log(SOAPY_SDR_ERROR, "master stream has been removed. Aborting.");
-            throw std::runtime_error("master stream has been removed. Aborting.");
+            // Notify readStream() that the master stream has been removed
+            // so that the application can be closed gracefully
+            SoapySDR_log(SOAPY_SDR_ERROR, "Master stream has been removed. Stopping.");
+            device_unavailable = true;
         }
     }
 }
@@ -529,6 +529,12 @@ int SoapySDRPlay::acquireReadBuffer(SoapySDR::Stream *stream,
         {
            return SOAPY_SDR_TIMEOUT;
         }
+    }
+
+    if (device_unavailable)
+    {
+       SoapySDR_log(SOAPY_SDR_ERROR, "Device is unavailable");
+       return SOAPY_SDR_NOT_SUPPORTED;
     }
 
     // extract handle and buffer

@@ -313,6 +313,8 @@ private:
     int gr_changed;
     int rf_changed;
     int fs_changed;
+    // event callback reporting device is unavailable
+    bool device_unavailable;
     const int updateTimeout = 500;   // 500ms timeout for updates
 
 public:
