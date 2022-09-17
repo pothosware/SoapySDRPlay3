@@ -310,10 +310,12 @@ private:
     static std::unordered_map<std::string, sdrplay_api_DeviceT*> selectedRSPDevices;
 
     // RX callback reporting changes to gain reduction, frequency, sample rate
-    int gr_changed;
-    int rf_changed;
-    int fs_changed;
-    const int updateTimeout = 500;   // 500ms timeout for updates
+    std::mutex value_changed_mutex;
+    std::condition_variable value_changed_cv;
+    bool gr_changed;
+    bool rf_changed;
+    bool fs_changed;
+    const std::chrono::milliseconds updateTimeout = std::chrono::milliseconds(500);
 
 public:
 

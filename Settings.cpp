@@ -518,17 +518,10 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    }
    if ((doUpdate == true) && (streamActive))
    {
-      gr_changed = 0;
+      gr_changed = false;
       sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-      for (int i = 0; i < updateTimeout; ++i)
-      {
-         if (gr_changed != 0) {
-            break;
-         }
-         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-      if (gr_changed == 0)
-      {
+      std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
+      if (!value_changed_cv.wait_for(value_changed_lock, updateTimeout, [this]{return gr_changed;})) {
          SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
       }
    }
@@ -607,17 +600,10 @@ void SoapySDRPlay::setFrequency(const int direction,
          chParams->tunerParams.rfFreq.rfHz = (uint32_t)frequency;
          if (streamActive)
          {
-            rf_changed = 0;
+            rf_changed = false;
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
-            for (int i = 0; i < updateTimeout; ++i)
-            {
-               if (rf_changed != 0) {
-                  break;
-               }
-               std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            }
-            if (rf_changed == 0)
-            {
+            std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
+            if (!value_changed_cv.wait_for(value_changed_lock, updateTimeout, [this]{return rf_changed;})) {
                SoapySDR_log(SOAPY_SDR_WARNING, "RF center frequency update timeout.");
             }
          }
@@ -767,19 +753,12 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
              // beware that when the fs change crosses the boundary between
              // 2,685,312 and 2,685,313 the rx_callbacks stop for some
              // reason
-             fs_changed = 0;
+             fs_changed = false;
              sdrplay_api_Update(device.dev, device.tuner, reasonForUpdate, sdrplay_api_Update_Ext1_None);
              if (waitForUpdate)
              {
-                for (int i = 0; i < updateTimeout; ++i)
-                {
-                   if (fs_changed != 0) {
-                      break;
-                   }
-                   std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                }
-                if (fs_changed == 0)
-                {
+                std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
+                if (!value_changed_cv.wait_for(value_changed_lock, updateTimeout, [this]{return fs_changed;})) {
                    SoapySDR_log(SOAPY_SDR_WARNING, "Sample rate/decimation update timeout.");
                 }
              }
@@ -1382,17 +1361,10 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       chParams->tunerParams.gain.LNAstate = static_cast<unsigned char>(stoul(value));
       if (streamActive)
       {
-         gr_changed = 0;
+         gr_changed = false;
          sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
-         for (int i = 0; i < updateTimeout; ++i)
-         {
-            if (gr_changed != 0) {
-               break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-         }
-         if (gr_changed == 0)
-         {
+         std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
+         if (!value_changed_cv.wait_for(value_changed_lock, updateTimeout, [this]{return gr_changed;})) {
             SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
          }
       }
