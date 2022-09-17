@@ -737,7 +737,6 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
               chParams->ctrlParams.decimation.wideBandSignal = 0;
           }
           reasonForUpdate = (sdrplay_api_ReasonForUpdateT)(reasonForUpdate | sdrplay_api_Update_Ctrl_Decimation);
-          waitForUpdate = true;
        }
        if (bwType != chParams->tunerParams.bwType)
        {
