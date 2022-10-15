@@ -1915,3 +1915,24 @@ void SoapySDRPlay::releaseDevice()
 
     return;
 }
+
+#ifdef SHOW_SERIAL_NUMBER_IN_MESSAGES
+void SoapySDRPlay::SoapySDR_log(const SoapySDRLogLevel logLevel,
+                                const char *message) const
+{
+    std::string message_with_info_string = "[S/N=" + serNo + "] - " + message;
+    const char *message_with_info = message_with_info_string.c_str();
+    ::SoapySDR_log(logLevel, message_with_info);
+}
+
+void SoapySDRPlay::SoapySDR_logf(const SoapySDRLogLevel logLevel,
+                                const char *format, ...) const
+{
+    va_list argList;
+    va_start(argList, format);
+    std::string format_with_info_string = "[S/N=" + serNo + "] - " + format;
+    const char *format_with_info = format_with_info_string.c_str();
+    ::SoapySDR_vlogf(logLevel, format_with_info, argList);
+    va_end(argList);
+}
+#endif

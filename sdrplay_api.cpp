@@ -33,20 +33,20 @@ SoapySDRPlay::sdrplay_api::sdrplay_api()
     // Open API
     err = sdrplay_api_Open();
     if (err != sdrplay_api_Success) {
-        SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Open() Error: %s", sdrplay_api_GetErrorString(err));
-        SoapySDR_logf(SOAPY_SDR_ERROR, "Please check the sdrplay_api service to make sure it is up. If it is up, please restart it.");
+        ::SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Open() Error: %s", sdrplay_api_GetErrorString(err));
+        ::SoapySDR_logf(SOAPY_SDR_ERROR, "Please check the sdrplay_api service to make sure it is up. If it is up, please restart it.");
         throw std::runtime_error("sdrplay_api_Open() failed");
     }
 
     // Check API versions match
     err = sdrplay_api_ApiVersion(&ver);
     if (err != sdrplay_api_Success) {
-        SoapySDR_logf(SOAPY_SDR_ERROR, "ApiVersion Error: %s", sdrplay_api_GetErrorString(err));
+        ::SoapySDR_logf(SOAPY_SDR_ERROR, "ApiVersion Error: %s", sdrplay_api_GetErrorString(err));
         sdrplay_api_Close();
         throw std::runtime_error("ApiVersion() failed");
     }
     if (ver != SDRPLAY_API_VERSION) {
-        SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api version: '%.3f' does not equal build version: '%.3f'", ver, SDRPLAY_API_VERSION);
+        ::SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api version: '%.3f' does not equal build version: '%.3f'", ver, SDRPLAY_API_VERSION);
     }
 }
 
@@ -56,6 +56,6 @@ SoapySDRPlay::sdrplay_api::~sdrplay_api()
     // Close API
     err = sdrplay_api_Close();
     if (err != sdrplay_api_Success) {
-        SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Close() failed: %s", sdrplay_api_GetErrorString(err));
+        ::SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Close() failed: %s", sdrplay_api_GetErrorString(err));
     }
 }
