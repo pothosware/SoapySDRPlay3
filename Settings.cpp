@@ -759,7 +759,7 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
              {
                 std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
                 if (!value_changed_cv.wait_for(value_changed_lock, updateTimeout, [this]{return fs_changed;})) {
-                   SoapySDR_log(SOAPY_SDR_WARNING, "Sample rate/decimation update timeout.");
+                   SoapySDR_log(SOAPY_SDR_WARNING, "Sample rate update timeout.");
                 }
              }
           }
