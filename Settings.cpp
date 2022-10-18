@@ -753,7 +753,6 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
               chParams->ctrlParams.decimation.wideBandSignal = 0;
           }
           reasonForUpdate = (sdrplay_api_ReasonForUpdateT)(reasonForUpdate | sdrplay_api_Update_Ctrl_Decimation);
-          waitForUpdate = true;
        }
        if (bwType != chParams->tunerParams.bwType)
        {
@@ -782,7 +781,7 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
                 }
                 if (fs_changed == 0)
                 {
-                   SoapySDR_log(SOAPY_SDR_WARNING, "Sample rate/decimation update timeout.");
+                   SoapySDR_log(SOAPY_SDR_WARNING, "Sample rate update timeout.");
                 }
              }
           }
