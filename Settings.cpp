@@ -520,6 +520,7 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    if ((doUpdate == true) && (streamActive))
    {
       gr_changed = 0;
+      SoapySDR_log(SOAPY_SDR_INFO, "setGain() - calling sdrplay_api_Update(Tuner_Gr)");
       sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
       if (err != sdrplay_api_Success)
       {
@@ -1398,6 +1399,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       if (streamActive)
       {
          gr_changed = 0;
+         SoapySDR_log(SOAPY_SDR_INFO, "writeSetting() - calling sdrplay_api_Update(Tuner_Gr)");
          sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
          if (err != sdrplay_api_Success)
          {

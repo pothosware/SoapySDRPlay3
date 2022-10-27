@@ -85,6 +85,10 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq,
     }
     std::lock_guard<std::mutex> lock(stream->mutex);
 
+    if (params->grChanged != 0)
+    {
+        SoapySDR_logf(SOAPY_SDR_INFO, "gr_changed=%d params->grChanged=%d", gr_changed, params->grChanged);
+    }
     if (gr_changed == 0 && params->grChanged != 0)
     {
         gr_changed = params->grChanged;
