@@ -136,6 +136,12 @@ public:
 
     bool hasDCOffsetMode(const int direction, const size_t channel) const;
 
+    bool hasFrequencyCorrection(const int direction, const size_t channel) const;
+
+    void setFrequencyCorrection(const int direction, const size_t channel, const double value);
+
+    double getFrequencyCorrection(const int direction, const size_t channel) const;
+
     /*******************************************************************
      * Gain API
      ******************************************************************/
@@ -160,15 +166,24 @@ public:
 
     void setFrequency(const int direction,
                       const size_t channel,
+                      const double frequency,
+                      const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
+
+    void setFrequency(const int direction,
+                      const size_t channel,
                       const std::string &name,
                       const double frequency,
                       const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
+
+    double getFrequency(const int direction, const size_t channel) const;
 
     double getFrequency(const int direction, const size_t channel, const std::string &name) const;
 
     SoapySDR::RangeList getBandwidthRange(const int direction, const size_t channel) const;
 
     std::vector<std::string> listFrequencies(const int direction, const size_t channel) const;
+
+    SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel) const;
 
     SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel, const std::string &name) const;
 
@@ -299,6 +314,8 @@ private:
     volatile int gr_changed;
     volatile int rf_changed;
     volatile int fs_changed;
+    // event callback reporting device is unavailable
+    bool device_unavailable;
     const int updateTimeout = 500;   // 500ms timeout for updates
 
 public:

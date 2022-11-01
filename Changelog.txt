@@ -1,3 +1,9 @@
+Release 0.4.1 (2022-09-14)
+==========================
+
+- setFrequency() uses RF by default
+- New get/set methods for frequency correction
+
 Release 0.4.0 (2022-04-17)
 ==========================
 
