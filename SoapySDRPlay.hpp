@@ -274,6 +274,7 @@ private:
 
     void releaseDevice();
 
+    sdrplay_api_ErrT tryUpdate(sdrplay_api_ReasonForUpdateT reasonForUpdate);
 
     /*******************************************************************
      * Private variables
@@ -316,6 +317,7 @@ private:
     // event callback reporting device is unavailable
     bool device_unavailable;
     const int updateTimeout = 500;   // 500ms timeout for updates
+    const int retryCount = 3;        // number of sdrplay_api_Update() retries
 
 public:
 
