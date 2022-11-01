@@ -1926,7 +1926,7 @@ void SoapySDRPlay::releaseDevice()
 
 sdrplay_api_ErrT SoapySDRPlay::tryUpdate(sdrplay_api_ReasonForUpdateT reasonForUpdate)
 {
-    sdrplay_api_ErrT err;
+    sdrplay_api_ErrT err = sdrplay_api_Success;
 
     for (int i = 0 ; i < retryCount; ++i)
     {
