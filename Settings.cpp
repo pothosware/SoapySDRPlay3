@@ -85,6 +85,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
     streamActive = false;
 
+    device_unavailable = false;
+
     cacheKey = serNo;
     if (hwVer == SDRPLAY_RSPduo_ID) cacheKey += "@" + args.at("mode");
     SoapySDRPlay_getClaimedSerials().insert(cacheKey);
@@ -511,7 +513,6 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    else if (name == "RFGR")
    {
       if (chParams->tunerParams.gain.LNAstate != (int)value) {
-
           chParams->tunerParams.gain.LNAstate = (int)value;
           doUpdate = true;
       }
@@ -519,7 +520,12 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
    if ((doUpdate == true) && (streamActive))
    {
       gr_changed = false;
-      sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+      sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+      if (err != sdrplay_api_Success)
+      {
+         SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api_Update(Tuner_Gr) Error: %s", sdrplay_api_GetErrorString(err));
+         return;
+      }
       std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
       if (!value_changed_cv.wait_for(value_changed_lock, updateTimeout, [this]{return gr_changed;})) {
          SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
@@ -601,7 +607,12 @@ void SoapySDRPlay::setFrequency(const int direction,
          if (streamActive)
          {
             rf_changed = false;
-            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
+            sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
+            if (err != sdrplay_api_Success)
+            {
+               SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api_Update(Tuner_FrF) Error: %s", sdrplay_api_GetErrorString(err));
+               return;
+            }
             std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
             if (!value_changed_cv.wait_for(value_changed_lock, updateTimeout, [this]{return rf_changed;})) {
                SoapySDR_log(SOAPY_SDR_WARNING, "RF center frequency update timeout.");
@@ -753,7 +764,12 @@ void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, cons
              // 2,685,312 and 2,685,313 the rx_callbacks stop for some
              // reason
              fs_changed = false;
-             sdrplay_api_Update(device.dev, device.tuner, reasonForUpdate, sdrplay_api_Update_Ext1_None);
+             sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, reasonForUpdate, sdrplay_api_Update_Ext1_None);
+             if (err != sdrplay_api_Success)
+             {
+                 SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api_Update(%08x) Error: %s", reasonForUpdate, sdrplay_api_GetErrorString(err));
+                 return;
+             }
              if (waitForUpdate)
              {
                 std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
@@ -1361,7 +1377,12 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       if (streamActive)
       {
          gr_changed = false;
-         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+         sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+         if (err != sdrplay_api_Success)
+         {
+            SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api_Update(Tuner_Gr) Error: %s", sdrplay_api_GetErrorString(err));
+            return;
+         }
          std::unique_lock<std::mutex> value_changed_lock(value_changed_mutex);
          if (!value_changed_cv.wait_for(value_changed_lock, updateTimeout, [this]{return gr_changed;})) {
             SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");

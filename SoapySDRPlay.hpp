@@ -315,6 +315,8 @@ private:
     bool gr_changed;
     bool rf_changed;
     bool fs_changed;
+    // event callback reporting device is unavailable
+    bool device_unavailable;
     const std::chrono::milliseconds updateTimeout = std::chrono::milliseconds(500);
 
 public:
