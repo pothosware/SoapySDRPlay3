@@ -311,9 +311,9 @@ private:
     static std::unordered_map<std::string, sdrplay_api_DeviceT*> selectedRSPDevices;
 
     // RX callback reporting changes to gain reduction, frequency, sample rate
-    volatile int gr_changed;
-    volatile int rf_changed;
-    volatile int fs_changed;
+    int gr_changed;
+    int rf_changed;
+    int fs_changed;
     // event callback reporting device is unavailable
     bool device_unavailable;
     const int updateTimeout = 500;   // 500ms timeout for updates
