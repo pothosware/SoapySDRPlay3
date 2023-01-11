@@ -1596,6 +1596,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       if (device.hwVer == SDRPLAY_RSPdx_ID)
       {
          deviceParams->devParams->rspDxParams.hdrEnable = hdrEn;
+         SoapySDR_logf(SOAPY_SDR_INFO, "--> rspDxParams.hdrEnable=%d", deviceParams->devParams->rspDxParams.hdrEnable);
          if (streamActive)
          {
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_HdrEnable);
