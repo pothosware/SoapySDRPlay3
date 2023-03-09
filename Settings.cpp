@@ -943,7 +943,6 @@ void SoapySDRPlay::setBandwidth(const int direction, const size_t channel, const
       // gqrx uses the value 0 for the default; in this case set it to the
       // maximum value compatible with the sample rate
       sdrplay_api_Bw_MHzT bwType = getBwEnumForRate(bw_in > 0 ? bw_in : getSampleRate(direction, channel));
-      SoapySDR_logf(SOAPY_SDR_INFO, "setBandwidth() - bw_in=%lf bwType=%d", bw_in, bwType);
       if (chParams->tunerParams.bwType != bwType)
       {
          chParams->tunerParams.bwType = bwType;
