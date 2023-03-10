@@ -940,9 +940,12 @@ void SoapySDRPlay::setBandwidth(const int direction, const size_t channel, const
 
    if (direction == SOAPY_SDR_RX) 
    {
-      if (getBwValueFromEnum(chParams->tunerParams.bwType) != bw_in)
+      // gqrx uses the value 0 for the default; in this case set it to the
+      // maximum value compatible with the sample rate
+      sdrplay_api_Bw_MHzT bwType = getBwEnumForRate(bw_in > 0 ? bw_in : getSampleRate(direction, channel));
+      if (chParams->tunerParams.bwType != bwType)
       {
-         chParams->tunerParams.bwType = sdrPlayGetBwMhzEnum(bw_in);
+         chParams->tunerParams.bwType = bwType;
          if (streamActive)
          {
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_BwType, sdrplay_api_Update_Ext1_None);
@@ -1017,20 +1020,6 @@ double SoapySDRPlay::getBwValueFromEnum(sdrplay_api_Bw_MHzT bwEnum)
    else if (bwEnum == sdrplay_api_BW_7_000) return 7000000;
    else if (bwEnum == sdrplay_api_BW_8_000) return 8000000;
    else return 0;
-}
-
-
-sdrplay_api_Bw_MHzT SoapySDRPlay::sdrPlayGetBwMhzEnum(double bw)
-{
-   if      (bw == 200000) return sdrplay_api_BW_0_200;
-   else if (bw == 300000) return sdrplay_api_BW_0_300;
-   else if (bw == 600000) return sdrplay_api_BW_0_600;
-   else if (bw == 1536000) return sdrplay_api_BW_1_536;
-   else if (bw == 5000000) return sdrplay_api_BW_5_000;
-   else if (bw == 6000000) return sdrplay_api_BW_6_000;
-   else if (bw == 7000000) return sdrplay_api_BW_7_000;
-   else if (bw == 8000000) return sdrplay_api_BW_8_000;
-   else return sdrplay_api_BW_0_200;
 }
 
 /*******************************************************************

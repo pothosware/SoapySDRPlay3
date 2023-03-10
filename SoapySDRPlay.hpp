@@ -261,8 +261,6 @@ private:
 
     static double getBwValueFromEnum(sdrplay_api_Bw_MHzT bwEnum);
 
-    static sdrplay_api_Bw_MHzT sdrPlayGetBwMhzEnum(double bw);
-
     void selectDevice(const std::string &serial, const std::string &mode, const std::string &antenna);
 
     void selectDevice();
