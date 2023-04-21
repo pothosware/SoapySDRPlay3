@@ -340,12 +340,16 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
             }
             else
             {
-                // preserve biasT setting when changing tuner/antenna
-                unsigned char biasTen = chParams->rspDuoTunerParams.biasTEnable;
+                // preserve all the device and tuner settings
+                // when changing tuner/antenna
+                sdrplay_api_DevParamsT devParams = *deviceParams->devParams;
+                sdrplay_api_RxChannelParamsT rxChannelParams = *chParams;
                 sdrplay_api_TunerSelectT other_tuner = (device.tuner == sdrplay_api_Tuner_A) ? sdrplay_api_Tuner_B : sdrplay_api_Tuner_A;
                 selectDevice(other_tuner, device.rspDuoMode,
                              device.rspDuoSampleFreq, nullptr);
-                chParams->rspDuoTunerParams.biasTEnable = biasTen;
+                // restore device and tuner settings
+                *deviceParams->devParams = devParams;
+                *chParams = rxChannelParams;
             }
         }
     }
