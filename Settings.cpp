@@ -61,6 +61,9 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     // - DC correction: on
     // - IQ balance: on
 
+    // change the default AGC set point to -30dBfs
+    chParams->ctrlParams.agc.setPoint_dBfs = -30;
+
     // process additional device string arguments
     for (std::pair<std::string, std::string> arg : args) {
         // ignore 'driver', 'label', 'mode', 'serial', and 'soapy'
@@ -609,6 +612,13 @@ void SoapySDRPlay::setFrequency(const int direction,
                                  const SoapySDR::Kwargs &args)
 {
    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
+   SoapySDR::RangeList frequencyRange = SoapySDRPlay::getFrequencyRange(direction, channel, name);
+   if (!(frequency >= frequencyRange.front().minimum() && frequency <= frequencyRange.back().maximum()))
+   {
+      SoapySDR_logf(SOAPY_SDR_WARNING, "RF center frequency out of range - frequency=%lg", frequency);
+      return;
+   }
 
    if (direction == SOAPY_SDR_RX)
    {
