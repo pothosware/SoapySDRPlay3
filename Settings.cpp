@@ -613,37 +613,40 @@ void SoapySDRPlay::setFrequency(const int direction,
 {
    std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-   SoapySDR::RangeList frequencyRange = SoapySDRPlay::getFrequencyRange(direction, channel, name);
-   if (!(frequency >= frequencyRange.front().minimum() && frequency <= frequencyRange.back().maximum()))
-   {
-      SoapySDR_logf(SOAPY_SDR_WARNING, "RF center frequency out of range - frequency=%lg", frequency);
-      return;
-   }
 
    if (direction == SOAPY_SDR_RX)
    {
-      if ((name == "RF") && (chParams->tunerParams.rfFreq.rfHz != (uint32_t)frequency))
+      if (name == "RF")
       {
-         chParams->tunerParams.rfFreq.rfHz = (uint32_t)frequency;
-         if (streamActive)
+         SoapySDR::RangeList frequencyRange = getFrequencyRange(direction, channel, name);
+         if (!(frequency >= frequencyRange.front().minimum() && frequency <= frequencyRange.back().maximum()))
          {
-            rf_changed = 0;
-            sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
-            if (err != sdrplay_api_Success)
+            SoapySDR_logf(SOAPY_SDR_WARNING, "RF center frequency out of range - frequency=%lg", frequency);
+            return;
+         }
+         if (chParams->tunerParams.rfFreq.rfHz != (uint32_t)frequency)
+         {
+            chParams->tunerParams.rfFreq.rfHz = (uint32_t)frequency;
+            if (streamActive)
             {
-               SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api_Update(Tuner_FrF) Error: %s", sdrplay_api_GetErrorString(err));
-               return;
-            }
-            for (int i = 0; i < updateTimeout; ++i)
-            {
-               if (rf_changed != 0) {
-                  break;
+               rf_changed = 0;
+               sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Frf, sdrplay_api_Update_Ext1_None);
+               if (err != sdrplay_api_Success)
+               {
+                  SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api_Update(Tuner_FrF) Error: %s", sdrplay_api_GetErrorString(err));
+                  return;
                }
-               std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            }
-            if (rf_changed == 0)
-            {
-               SoapySDR_log(SOAPY_SDR_WARNING, "RF center frequency update timeout.");
+               for (int i = 0; i < updateTimeout; ++i)
+               {
+                  if (rf_changed != 0) {
+                     break;
+                  }
+                  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+               }
+               if (rf_changed == 0)
+               {
+                  SoapySDR_log(SOAPY_SDR_WARNING, "RF center frequency update timeout.");
+               }
             }
          }
       }
