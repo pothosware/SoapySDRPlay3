@@ -51,6 +51,9 @@ IF(SHOW_SERIAL_NUMBER_IN_MESSAGES)
     ADD_DEFINITIONS( -DSHOW_SERIAL_NUMBER_IN_MESSAGES )
 ENDIF()
 
+# make sure the path for the SDRplay API library is in the runtime search path
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 SOAPY_SDR_MODULE_UTIL(
     TARGET sdrPlaySupport
     SOURCES
