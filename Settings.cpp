@@ -1451,6 +1451,38 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
          sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
       }
    }
+   else if (key == "agc_attack")
+   {
+      chParams->ctrlParams.agc.attack_ms = (unsigned short)stoi(value);
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
+   else if (key == "agc_decay")
+   {
+      chParams->ctrlParams.agc.decay_ms = (unsigned short)stoi(value);
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
+   else if (key == "agc_decay_delay")
+   {
+      chParams->ctrlParams.agc.decay_delay_ms = (unsigned short)stoi(value);
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
+   else if (key == "agc_decay_threshold")
+   {
+      chParams->ctrlParams.agc.decay_threshold_dB = (unsigned short)stoi(value);
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
    else if (key == "extref_ctrl")
    {
       unsigned char extRef;
@@ -1630,6 +1662,22 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     else if (key == "agc_setpoint")
     {
        return std::to_string(chParams->ctrlParams.agc.setPoint_dBfs);
+    }
+    else if (key == "agc_attack")
+    {
+       return std::to_string(chParams->ctrlParams.agc.attack_ms);
+    }
+    else if (key == "agc_decay")
+    {
+       return std::to_string(chParams->ctrlParams.agc.decay_ms);
+    }
+    else if (key == "agc_decay_delay")
+    {
+       return std::to_string(chParams->ctrlParams.agc.decay_delay_ms);
+    }
+    else if (key == "agc_decay_threshold")
+    {
+       return std::to_string(chParams->ctrlParams.agc.decay_threshold_dB);
     }
     else if (key == "extref_ctrl")
     {
