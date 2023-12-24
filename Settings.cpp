@@ -475,17 +475,30 @@ bool SoapySDRPlay::hasGainMode(const int direction, const size_t channel) const
 
 void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
 {
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
+   std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-    sdrplay_api_AgcControlT agc_control = automatic ? sdrplay_api_AGC_CTRL_EN : sdrplay_api_AGC_DISABLE;
-    if (chParams->ctrlParams.agc.enable != agc_control)
-    {
-        chParams->ctrlParams.agc.enable = agc_control;
-        if (streamActive)
-        {
+   if (automatic)
+   {
+      if (chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
+      {
+         chParams->ctrlParams.agc.enable = sdrplay_api_AGC_50HZ;
+         if (streamActive)
+         {
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
-        }
-    }
+         }
+      }
+   }
+   else
+   {
+      if (chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE)
+      {
+         chParams->ctrlParams.agc.enable = sdrplay_api_AGC_DISABLE;
+         if (streamActive)
+         {
+            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+         }
+      }
+   }
 }
 
 bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
@@ -1268,14 +1281,50 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     IQcorrArg.type = SoapySDR::ArgInfo::BOOL;
     setArgs.push_back(IQcorrArg);
 
-    SoapySDR::ArgInfo SetPointArg;
-    SetPointArg.key = "agc_setpoint";
-    SetPointArg.value = "-30";
-    SetPointArg.name = "AGC Setpoint";
-    SetPointArg.description = "AGC Setpoint (dBfs)";
-    SetPointArg.type = SoapySDR::ArgInfo::INT;
-    SetPointArg.range = SoapySDR::Range(-60, 0);
-    setArgs.push_back(SetPointArg);
+    SoapySDR::ArgInfo AGCSetPointArg;
+    AGCSetPointArg.key = "agc_setpoint";
+    AGCSetPointArg.value = "-30";
+    AGCSetPointArg.name = "AGC Setpoint";
+    AGCSetPointArg.description = "AGC Setpoint (dBfs)";
+    AGCSetPointArg.type = SoapySDR::ArgInfo::INT;
+    AGCSetPointArg.range = SoapySDR::Range(-60, 0);
+    setArgs.push_back(AGCSetPointArg);
+
+    SoapySDR::ArgInfo AGCAttackArg;
+    AGCAttackArg.key = "agc_attack";
+    AGCAttackArg.value = "0";
+    AGCAttackArg.name = "AGC Attack";
+    AGCAttackArg.description = "AGC Attack (ms)";
+    AGCAttackArg.type = SoapySDR::ArgInfo::INT;
+    AGCAttackArg.range = SoapySDR::Range(0, 1000);
+    setArgs.push_back(AGCAttackArg);
+
+    SoapySDR::ArgInfo AGCDecayArg;
+    AGCDecayArg.key = "agc_decay";
+    AGCDecayArg.value = "0";
+    AGCDecayArg.name = "AGC Decay";
+    AGCDecayArg.description = "AGC Decay (ms)";
+    AGCDecayArg.type = SoapySDR::ArgInfo::INT;
+    AGCDecayArg.range = SoapySDR::Range(0, 1000);
+    setArgs.push_back(AGCDecayArg);
+
+    SoapySDR::ArgInfo AGCDecayDelayArg;
+    AGCDecayDelayArg.key = "agc_decay_delay";
+    AGCDecayDelayArg.value = "0";
+    AGCDecayDelayArg.name = "AGC Decay Delay";
+    AGCDecayDelayArg.description = "AGC Decay Delay (ms)";
+    AGCDecayDelayArg.type = SoapySDR::ArgInfo::INT;
+    AGCDecayDelayArg.range = SoapySDR::Range(0, 1000);
+    setArgs.push_back(AGCDecayDelayArg);
+
+    SoapySDR::ArgInfo AGCDecayThresholdArg;
+    AGCDecayThresholdArg.key = "agc_decay_threshold";
+    AGCDecayThresholdArg.value = "0";
+    AGCDecayThresholdArg.name = "AGC Decay Threshold";
+    AGCDecayThresholdArg.description = "AGC Decay Threshold (dB)";
+    AGCDecayThresholdArg.type = SoapySDR::ArgInfo::INT;
+    AGCDecayThresholdArg.range = SoapySDR::Range(0, 30);
+    setArgs.push_back(AGCDecayThresholdArg);
 
     if (device.hwVer == SDRPLAY_RSP2_ID) // RSP2/RSP2pro
     {
@@ -1445,7 +1494,44 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    }
    else if (key == "agc_setpoint")
    {
+      chParams->ctrlParams.agc.enable = sdrplay_api_AGC_CTRL_EN;
       chParams->ctrlParams.agc.setPoint_dBfs = stoi(value);
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
+   else if (key == "agc_attack")
+   {
+      chParams->ctrlParams.agc.enable = sdrplay_api_AGC_CTRL_EN;
+      chParams->ctrlParams.agc.attack_ms = stoi(value);
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
+   else if (key == "agc_decay")
+   {
+      chParams->ctrlParams.agc.enable = sdrplay_api_AGC_CTRL_EN;
+      chParams->ctrlParams.agc.decay_ms = stoi(value);
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
+   else if (key == "agc_decay_delay")
+   {
+      chParams->ctrlParams.agc.enable = sdrplay_api_AGC_CTRL_EN;
+      chParams->ctrlParams.agc.decay_delay_ms = stoi(value);
+      if (streamActive)
+      {
+         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
+      }
+   }
+   else if (key == "agc_decay_threshold")
+   {
+      chParams->ctrlParams.agc.enable = sdrplay_api_AGC_CTRL_EN;
+      chParams->ctrlParams.agc.decay_threshold_dB = stoi(value);
       if (streamActive)
       {
          sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Ctrl_Agc, sdrplay_api_Update_Ext1_None);
@@ -1630,6 +1716,22 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     else if (key == "agc_setpoint")
     {
        return std::to_string(chParams->ctrlParams.agc.setPoint_dBfs);
+    }
+    else if (key == "agc_attack")
+    {
+       return std::to_string(chParams->ctrlParams.agc.attack_ms);
+    }
+    else if (key == "agc_decay")
+    {
+       return std::to_string(chParams->ctrlParams.agc.decay_ms);
+    }
+    else if (key == "agc_decay_delay")
+    {
+       return std::to_string(chParams->ctrlParams.agc.decay_delay_ms);
+    }
+    else if (key == "agc_decay_threshold")
+    {
+       return std::to_string(chParams->ctrlParams.agc.decay_threshold_dB);
     }
     else if (key == "extref_ctrl")
     {
