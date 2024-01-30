@@ -1823,15 +1823,12 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     if (selectedRSPDevices.count(rspDeviceId)) {
         sdrplay_api_DeviceT *currDevice = selectedRSPDevices.at(rspDeviceId);
         selectedRSPDevices.erase(rspDeviceId);
-        sdrplay_api_LockDeviceApi();
         err = sdrplay_api_ReleaseDevice(currDevice);
         if (err != sdrplay_api_Success)
         {
-            sdrplay_api_UnlockDeviceApi();
             SoapySDR_logf(SOAPY_SDR_ERROR, "ReleaseDevice Error: %s", sdrplay_api_GetErrorString(err));
             throw std::runtime_error("ReleaseDevice() failed");
         }
-        sdrplay_api_UnlockDeviceApi();
     }
 
     // save all the device configuration so we can put it back later on
@@ -1971,15 +1968,12 @@ void SoapySDRPlay::releaseDevice()
             return;
         }
         selectedRSPDevices.erase(rspDeviceId);
-        sdrplay_api_LockDeviceApi();
         err = sdrplay_api_ReleaseDevice(currDevice);
         if (err != sdrplay_api_Success)
         {
-            sdrplay_api_UnlockDeviceApi();
             SoapySDR_logf(SOAPY_SDR_ERROR, "ReleaseDevice Error: %s", sdrplay_api_GetErrorString(err));
             throw std::runtime_error("ReleaseDevice() failed");
         }
-        sdrplay_api_UnlockDeviceApi();
     }
 
     return;
