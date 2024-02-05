@@ -6,7 +6,7 @@
 
 ## Dependencies
 
-* Get SDR Play driver binaries 'API/HW driver V3.x' from - http://sdrplay.com/downloads
+* SDRplay API - download (and install) SDRplay API from - https://www.sdrplay.com/downloads - NOTE: the current version of this module requires SDRplay API V3.14 or later
 * SoapySDR - https://github.com/pothosware/SoapySDR/wiki
 
 ## Troubleshooting
