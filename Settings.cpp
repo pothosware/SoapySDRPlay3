@@ -889,6 +889,30 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
     return output_sample_rates;
 }
 
+SoapySDR::RangeList SoapySDRPlay::getSampleRateRange(const int direction, const size_t channel) const
+{
+    SoapySDR::RangeList output_sample_rates;
+
+    if (device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoMode != sdrplay_api_RspDuoMode_Single_Tuner)
+    {
+        output_sample_rates.push_back(SoapySDR::Range(62500, 62500));
+        output_sample_rates.push_back(SoapySDR::Range(125000, 125000));
+        output_sample_rates.push_back(SoapySDR::Range(250000, 250000));
+        output_sample_rates.push_back(SoapySDR::Range(500000, 500000));
+        output_sample_rates.push_back(SoapySDR::Range(1000000, 1000000));
+        output_sample_rates.push_back(SoapySDR::Range(2000000, 2000000));
+        return output_sample_rates;
+    }
+
+    output_sample_rates.push_back(SoapySDR::Range(62500, 62500));
+    output_sample_rates.push_back(SoapySDR::Range(125000, 125000));
+    output_sample_rates.push_back(SoapySDR::Range(250000, 250000));
+    output_sample_rates.push_back(SoapySDR::Range(500000, 500000));
+    output_sample_rates.push_back(SoapySDR::Range(1000000, 1000000));
+    output_sample_rates.push_back(SoapySDR::Range(2000000, 10660000));
+    return output_sample_rates;
+}
+
 double SoapySDRPlay::getInputSampleRateAndDecimation(uint32_t output_sample_rate, unsigned int *decM, unsigned int *decEnable, sdrplay_api_If_kHzT *ifType) const
 {
     sdrplay_api_If_kHzT lif = sdrplay_api_IF_1_620;
