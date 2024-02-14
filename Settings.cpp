@@ -905,9 +905,13 @@ SoapySDR::RangeList SoapySDRPlay::getSampleRateRange(const int direction, const 
     }
 
     output_sample_rates.push_back(SoapySDR::Range(62500, 62500));
+    output_sample_rates.push_back(SoapySDR::Range(96000, 96000));
     output_sample_rates.push_back(SoapySDR::Range(125000, 125000));
+    output_sample_rates.push_back(SoapySDR::Range(192000, 192000));
     output_sample_rates.push_back(SoapySDR::Range(250000, 250000));
+    output_sample_rates.push_back(SoapySDR::Range(384000, 384000));
     output_sample_rates.push_back(SoapySDR::Range(500000, 500000));
+    output_sample_rates.push_back(SoapySDR::Range(768000, 768000));
     output_sample_rates.push_back(SoapySDR::Range(1000000, 1000000));
     output_sample_rates.push_back(SoapySDR::Range(2000000, 10660000));
     return output_sample_rates;
