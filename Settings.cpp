@@ -125,6 +125,7 @@ std::string SoapySDRPlay::getHardwareKey(void) const
     if (hwVer == SDRPLAY_RSP2_ID) return "RSP2";
     if (hwVer == SDRPLAY_RSPduo_ID) return "RSPduo";
     if (hwVer == SDRPLAY_RSPdx_ID) return "RSPdx";
+    if (hwVer == SDRPLAY_RSPdxR2_ID) return "RSPdx-R2";
     return "UNKNOWN";
 }
 
@@ -174,6 +175,11 @@ std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const s
         antennas.push_back("Hi-Z");
     }
     else if (device.hwVer == SDRPLAY_RSPdx_ID) {
+        antennas.push_back("Antenna A");
+        antennas.push_back("Antenna B");
+        antennas.push_back("Antenna C");
+    }
+    else if (device.hwVer == SDRPLAY_RSPdxR2_ID) {
         antennas.push_back("Antenna A");
         antennas.push_back("Antenna B");
         antennas.push_back("Antenna C");
@@ -266,6 +272,26 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
         }
     }
     else if (device.hwVer == SDRPLAY_RSPdx_ID)
+    {
+        if (name == "Antenna A")
+        {
+            deviceParams->devParams->rspDxParams.antennaSel = sdrplay_api_RspDx_ANTENNA_A;
+        }
+        else if (name == "Antenna B")
+        {
+            deviceParams->devParams->rspDxParams.antennaSel = sdrplay_api_RspDx_ANTENNA_B;
+        }
+        else if (name == "Antenna C")
+        {
+            deviceParams->devParams->rspDxParams.antennaSel = sdrplay_api_RspDx_ANTENNA_C;
+        }
+
+        if (streamActive)
+        {
+            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_AntennaControl);
+        }
+    }
+    else if (device.hwVer == SDRPLAY_RSPdxR2_ID)
     {
         if (name == "Antenna A")
         {
@@ -395,6 +421,18 @@ std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) 
         }
     }
     else if (device.hwVer == SDRPLAY_RSPdx_ID)
+    {
+        if (deviceParams->devParams->rspDxParams.antennaSel == sdrplay_api_RspDx_ANTENNA_A) {
+            return "Antenna A";
+        }
+        else if (deviceParams->devParams->rspDxParams.antennaSel == sdrplay_api_RspDx_ANTENNA_B) {
+            return "Antenna B";
+        }
+        else if (deviceParams->devParams->rspDxParams.antennaSel == sdrplay_api_RspDx_ANTENNA_C) {
+            return "Antenna C";
+        }
+    }
+    else if (device.hwVer == SDRPLAY_RSPdxR2_ID)
     {
         if (deviceParams->devParams->rspDxParams.antennaSel == sdrplay_api_RspDx_ANTENNA_A) {
             return "Antenna A";
@@ -591,6 +629,10 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
       return SoapySDR::Range(0, 9);
    }
    else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSPdx_ID))
+   {
+      return SoapySDR::Range(0, 27);
+   }
+   else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSPdxR2_ID))
    {
       return SoapySDR::Range(0, 27);
    }
@@ -1102,6 +1144,10 @@ unsigned char SoapySDRPlay::stringToHWVer(std::string hwVer)
    {
       return SDRPLAY_RSPdx_ID;
    }
+   else if (strcasecmp(hwVer.c_str(), "RSPdx-R2") == 0)
+   {
+      return SDRPLAY_RSPdxR2_ID;
+   }
    return 0;
 }
 
@@ -1126,6 +1172,9 @@ std::string SoapySDRPlay::HWVertoString(unsigned char hwVer)
       break;
    case SDRPLAY_RSPdx_ID:
       return "RSPdx";
+      break;
+   case SDRPLAY_RSPdxR2_ID:
+      return "RSPdx-R2";
       break;
    }
    return "";
@@ -1267,6 +1316,44 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        setArgs.push_back(RfGainArg);
     }
     else if (device.hwVer == SDRPLAY_RSPdx_ID)
+    {
+       SoapySDR::ArgInfo RfGainArg;
+       RfGainArg.key = "rfgain_sel";
+       RfGainArg.value = "4";
+       RfGainArg.name = "RF Gain Select";
+       RfGainArg.description = "RF Gain Select";
+       RfGainArg.type = SoapySDR::ArgInfo::STRING;
+       RfGainArg.options.push_back("0");
+       RfGainArg.options.push_back("1");
+       RfGainArg.options.push_back("2");
+       RfGainArg.options.push_back("3");
+       RfGainArg.options.push_back("4");
+       RfGainArg.options.push_back("5");
+       RfGainArg.options.push_back("6");
+       RfGainArg.options.push_back("7");
+       RfGainArg.options.push_back("8");
+       RfGainArg.options.push_back("9");
+       RfGainArg.options.push_back("10");
+       RfGainArg.options.push_back("11");
+       RfGainArg.options.push_back("12");
+       RfGainArg.options.push_back("13");
+       RfGainArg.options.push_back("14");
+       RfGainArg.options.push_back("15");
+       RfGainArg.options.push_back("16");
+       RfGainArg.options.push_back("17");
+       RfGainArg.options.push_back("18");
+       RfGainArg.options.push_back("19");
+       RfGainArg.options.push_back("20");
+       RfGainArg.options.push_back("21");
+       RfGainArg.options.push_back("22");
+       RfGainArg.options.push_back("23");
+       RfGainArg.options.push_back("24");
+       RfGainArg.options.push_back("25");
+       RfGainArg.options.push_back("26");
+       RfGainArg.options.push_back("27");
+       setArgs.push_back(RfGainArg);
+    }
+    else if (device.hwVer == SDRPLAY_RSPdxR2_ID)
     {
        SoapySDR::ArgInfo RfGainArg;
        RfGainArg.key = "rfgain_sel";
@@ -1457,6 +1544,40 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        HDRArg.type = SoapySDR::ArgInfo::BOOL;
        setArgs.push_back(HDRArg);
     }
+    else if (device.hwVer == SDRPLAY_RSPdxR2_ID) // RSPdx-R2
+    {
+       SoapySDR::ArgInfo BiasTArg;
+       BiasTArg.key = "biasT_ctrl";
+       BiasTArg.value = "true";
+       BiasTArg.name = "BiasT Enable";
+       BiasTArg.description = "BiasT Control";
+       BiasTArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(BiasTArg);
+
+       SoapySDR::ArgInfo RfNotchArg;
+       RfNotchArg.key = "rfnotch_ctrl";
+       RfNotchArg.value = "true";
+       RfNotchArg.name = "RfNotch Enable";
+       RfNotchArg.description = "RF Notch Filter Control";
+       RfNotchArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(RfNotchArg);
+
+       SoapySDR::ArgInfo DabNotchArg;
+       DabNotchArg.key = "dabnotch_ctrl";
+       DabNotchArg.value = "true";
+       DabNotchArg.name = "DabNotch Enable";
+       DabNotchArg.description = "DAB Notch Filter Control";
+       DabNotchArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(DabNotchArg);
+
+       SoapySDR::ArgInfo HDRArg;
+       HDRArg.key = "hdr_ctrl";
+       HDRArg.value = "true";
+       HDRArg.name = "HDR Enable";
+       HDRArg.description = "RSPdx HDR Control";
+       HDRArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(HDRArg);
+    }
 
     return setArgs;
 }
@@ -1574,6 +1695,14 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_BiasTControl);
          }
       }
+      else if (device.hwVer == SDRPLAY_RSPdxR2_ID)
+      {
+         deviceParams->devParams->rspDxParams.biasTEnable = biasTen;
+         if (streamActive)
+         {
+            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_BiasTControl);
+         }
+      }
    }
    else if (key == "rfnotch_ctrl")
    {
@@ -1623,6 +1752,14 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_RfNotchControl);
          }
       }
+      else if (device.hwVer == SDRPLAY_RSPdxR2_ID)
+      {
+         deviceParams->devParams->rspDxParams.rfNotchEnable = notchEn;
+         if (streamActive)
+         {
+            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_RfNotchControl);
+         }
+      }
    }
    else if (key == "dabnotch_ctrl")
    {
@@ -1653,6 +1790,14 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_RfDabNotchControl);
          }
       }
+      else if (device.hwVer == SDRPLAY_RSPdxR2_ID)
+      {
+         deviceParams->devParams->rspDxParams.rfDabNotchEnable = dabNotchEn;
+         if (streamActive)
+         {
+            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_RfDabNotchControl);
+         }
+      }
    }
    else if (key == "hdr_ctrl")
    {
@@ -1660,6 +1805,15 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       if (value == "false") hdrEn = 0;
       else                  hdrEn = 1;
       if (device.hwVer == SDRPLAY_RSPdx_ID)
+      {
+         deviceParams->devParams->rspDxParams.hdrEnable = hdrEn;
+         SoapySDR_logf(SOAPY_SDR_INFO, "--> rspDxParams.hdrEnable=%d", deviceParams->devParams->rspDxParams.hdrEnable);
+         if (streamActive)
+         {
+            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_None, sdrplay_api_Update_RspDx_HdrEnable);
+         }
+      }
+      else if (device.hwVer == SDRPLAY_RSPdxR2_ID)
       {
          deviceParams->devParams->rspDxParams.hdrEnable = hdrEn;
          SoapySDR_logf(SOAPY_SDR_INFO, "--> rspDxParams.hdrEnable=%d", deviceParams->devParams->rspDxParams.hdrEnable);
@@ -1712,6 +1866,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        else if (device.hwVer == SDRPLAY_RSPduo_ID) biasTen = chParams->rspDuoTunerParams.biasTEnable;
        else if (device.hwVer == SDRPLAY_RSP1A_ID || device.hwVer == SDRPLAY_RSP1B_ID) biasTen = chParams->rsp1aTunerParams.biasTEnable;
        else if (device.hwVer == SDRPLAY_RSPdx_ID) biasTen = deviceParams->devParams->rspDxParams.biasTEnable;
+       else if (device.hwVer == SDRPLAY_RSPdxR2_ID) biasTen = deviceParams->devParams->rspDxParams.biasTEnable;
        if (biasTen == 0) return "false";
        else              return "true";
     }
@@ -1732,6 +1887,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        }
        else if (device.hwVer == SDRPLAY_RSP1A_ID || device.hwVer == SDRPLAY_RSP1B_ID) notchEn = deviceParams->devParams->rsp1aParams.rfNotchEnable;
        else if (device.hwVer == SDRPLAY_RSPdx_ID) notchEn = deviceParams->devParams->rspDxParams.rfNotchEnable;
+       else if (device.hwVer == SDRPLAY_RSPdxR2_ID) notchEn = deviceParams->devParams->rspDxParams.rfNotchEnable;
        if (notchEn == 0) return "false";
        else              return "true";
     }
@@ -1741,6 +1897,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        if (device.hwVer == SDRPLAY_RSPduo_ID) dabNotchEn = chParams->rspDuoTunerParams.rfDabNotchEnable;
        else if (device.hwVer == SDRPLAY_RSP1A_ID || device.hwVer == SDRPLAY_RSP1B_ID) dabNotchEn = deviceParams->devParams->rsp1aParams.rfDabNotchEnable;
        else if (device.hwVer == SDRPLAY_RSPdx_ID) dabNotchEn = deviceParams->devParams->rspDxParams.rfDabNotchEnable;
+       else if (device.hwVer == SDRPLAY_RSPdxR2_ID) dabNotchEn = deviceParams->devParams->rspDxParams.rfDabNotchEnable;
        if (dabNotchEn == 0) return "false";
        else                 return "true";
     }
@@ -1748,6 +1905,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     {
        unsigned char hdrEn = 0;
        if (device.hwVer == SDRPLAY_RSPdx_ID) hdrEn = deviceParams->devParams->rspDxParams.hdrEnable;
+       if (device.hwVer == SDRPLAY_RSPdxR2_ID) hdrEn = deviceParams->devParams->rspDxParams.hdrEnable;
        if (hdrEn == 0) return "false";
        else            return "true";
     }

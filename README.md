@@ -6,7 +6,7 @@
 
 ## Dependencies
 
-* SDRplay API - download (and install) SDRplay API from - https://www.sdrplay.com/downloads - NOTE: the current version of this module requires SDRplay API V3.14 or later
+* SDRplay API - download (and install) SDRplay API from - https://www.sdrplay.com/downloads - NOTE: the current version of this module requires SDRplay API V3.15 or later
 * SoapySDR - https://github.com/pothosware/SoapySDR/wiki
 
 ## Troubleshooting

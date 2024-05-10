@@ -75,6 +75,10 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
       {
          modelName = "RSPdx";
       }
+      else if (rspDevs[i].hwVer == SDRPLAY_RSPdxR2_ID)
+      {
+         modelName = "RSPdx-R2";
+      }
       else
       {
          modelName = "UNKNOWN";
