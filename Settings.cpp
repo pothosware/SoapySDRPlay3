@@ -540,6 +540,13 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
    bool doUpdate = false;
 
+   SoapySDR::Range gainRange = getGainRange(direction, channel, name);
+   if (!(value >= gainRange.minimum() && value <= gainRange.maximum()))
+   {
+      SoapySDR_logf(SOAPY_SDR_WARNING, "%s gain is out of range", name.c_str());
+      return;
+   }
+
    if (name == "IFGR")
    {
       if (chParams->ctrlParams.agc.enable == sdrplay_api_AGC_DISABLE)
@@ -606,7 +613,7 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
 {
    if (name == "IFGR")
    {
-      return SoapySDR::Range(20, 59);
+      return SoapySDR::Range(sdrplay_api_NORMAL_MIN_GR, MAX_BB_GR);
    }
    else if ((name == "RFGR") && (device.hwVer == SDRPLAY_RSP1_ID))
    {
