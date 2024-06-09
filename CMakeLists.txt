@@ -68,6 +68,15 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" 
     target_link_options(sdrPlaySupport PRIVATE -pthread)
 endif ()
 
+# XCode on MacOS requires rpath for SDRplay API library
+if(APPLE)
+    add_custom_command(
+        TARGET sdrPlaySupport POST_BUILD
+        COMMAND ${CMAKE_INSTALL_NAME_TOOL} -add-rpath /usr/local/lib "$<TARGET_FILE:sdrPlaySupport>"
+        COMMAND ${CMAKE_INSTALL_NAME_TOOL} -change libsdrplay_api.so.3 @rpath/libsdrplay_api.so.3 "$<TARGET_FILE:sdrPlaySupport>"
+    )
+endif(APPLE)
+
 ########################################################################
 # uninstall target
 ########################################################################
