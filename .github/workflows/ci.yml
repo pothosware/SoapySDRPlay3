@@ -37,7 +37,7 @@ jobs:
         run: |
           otool -L build/libsdrPlaySupport.so
           echo '--------------------------------------'
-          otool -l build/libsdrPlaySupport.so
+          otool -l build/libsdrPlaySupport.so | grep -B1 -A4 LC_RPATH
       #- name: Install
       #  run: |
       #    cd build

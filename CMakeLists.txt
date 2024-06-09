@@ -72,7 +72,7 @@ endif ()
 if(APPLE)
     add_custom_command(
         TARGET sdrPlaySupport POST_BUILD
-        COMMAND ${CMAKE_INSTALL_NAME_TOOL} -add-rpath /usr/local/lib "$<TARGET_FILE:sdrPlaySupport>"
+        COMMAND ${CMAKE_INSTALL_NAME_TOOL} -add_rpath /usr/local/lib "$<TARGET_FILE:sdrPlaySupport>"
         COMMAND ${CMAKE_INSTALL_NAME_TOOL} -change libsdrplay_api.so.3 @rpath/libsdrplay_api.so.3 "$<TARGET_FILE:sdrPlaySupport>"
     )
 endif(APPLE)
