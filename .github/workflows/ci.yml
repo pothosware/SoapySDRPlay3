@@ -35,7 +35,9 @@ jobs:
           make
       - name: Check things before install
         run: |
-          find build
+          otool -L build/libsdrPlaySupport.so
+          echo '--------------------------------------'
+          otool -l build/libsdrPlaySupport.so
       #- name: Install
       #  run: |
       #    cd build
