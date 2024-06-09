@@ -1,0 +1,42 @@
+name: CI
+
+on: push
+
+env:
+  SDRPLAY_SOFTWARE_DOWNLOADS: 'https://www.sdrplay.com/software'
+
+jobs:
+  macos-test:
+    name: MacOS test
+    runs-on: macos-latest
+    steps:
+      - name: Check MacOS version
+        run: sw_vers
+      - name: Install SoapySDR
+        run: brew install soapysdr
+      - name: Install SDRplay API 3.X
+        env:
+          SDRPLAY_API_FILE_MACOS: SDRplayAPI-macos-installer-universal-3.15.0.pkg
+        run: |
+          curl -s -S -O "$SDRPLAY_SOFTWARE_DOWNLOADS/$SDRPLAY_API_FILE_MACOS"
+          sudo installer -pkg "$SDRPLAY_API_FILE_MACOS" -target /
+      - name: Check SDRplay API install
+        run: |
+          ls -l /usr/local/lib
+          echo '--------------------------------------'
+          otool -L /usr/local/lib/libsdrplay_api.so
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          make
+      - name: Check things before install
+        run: |
+          find build
+      #- name: Install
+      #  run: |
+      #    cd build
+      #    sudo make install
