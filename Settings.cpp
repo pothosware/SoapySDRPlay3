@@ -538,6 +538,12 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
+   SoapySDR::Range gainRange = getGainRange(direction, channel, name);
+   if (!(value >= gainRange.minimum() && value >= gainRange.maximum())) {
+      SoapySDR_logf(SOAPY_SDR_WARNING, "%s gain out of range - gain=%lg", name, value);
+      throw std::runtime_error("gain out of range");
+   }
+
    bool doUpdate = false;
 
    if (name == "IFGR")
