@@ -1770,10 +1770,26 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        if (hdrEn == 0) return "false";
        else            return "true";
     }
-    //else if (key == "gain_ctrl_mode") //TODO
-      // return gain_controls->getGainControlModeKeyValue();
+    else if (key == "gain_ctrl_mode") 
+    {
+       if (dynamic_cast<GainControlsLegacy *>(gain_controls)) {
+          return "LEGACY";
+       } else if (dynamic_cast<GainControlsDB *>(gain_controls)) {
+          return "DB";
+       } else if (dynamic_cast<GainControlsRFATT *>(gain_controls)) {
+          return "RFATT";
+       } else if (dynamic_cast<GainControlsSteps *>(gain_controls)) {
+          return "STEPS";
+       } else if (dynamic_cast<GainControlsIFGR *>(gain_controls)) {
+          return "IFGR";
+       } else {
+          SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting string for gain_ctrl_mode");
+          return "";
+       }
+       
+    }
 
-    // SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());
+    SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());
     return "";
 }
 
