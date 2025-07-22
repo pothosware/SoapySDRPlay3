@@ -1438,7 +1438,12 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       if (streamActive)
       {
          gr_changed = 0;
-         sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+         sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+         if (err != sdrplay_api_Success)
+         {
+            SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api_Update(Tuner_Gr) Error: %s", sdrplay_api_GetErrorString(err));
+            return;
+         }
          for (int i = 0; i < updateTimeout; ++i)
          {
             if (gr_changed != 0) {
@@ -1676,7 +1681,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       } else if (value == "ifgr" || value == "IFGR") {
          gain_controls = new GainControlsIFGR(device, chParams);
       } else {
-         SoapySDR_logf(SOAPY_SDR_WARNING, "Invalid gain_ctrl_mode: %s", value);
+         SoapySDR_logf(SOAPY_SDR_WARNING, "Invalid gain_ctrl_mode: %s", value.c_str());
       }
    }
 }
@@ -1765,8 +1770,26 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        if (hdrEn == 0) return "false";
        else            return "true";
     }
+    else if (key == "gain_ctrl_mode") 
+    {
+       if (dynamic_cast<GainControlsLegacy *>(gain_controls)) {
+          return "LEGACY";
+       } else if (dynamic_cast<GainControlsDB *>(gain_controls)) {
+          return "DB";
+       } else if (dynamic_cast<GainControlsRFATT *>(gain_controls)) {
+          return "RFATT";
+       } else if (dynamic_cast<GainControlsSteps *>(gain_controls)) {
+          return "STEPS";
+       } else if (dynamic_cast<GainControlsIFGR *>(gain_controls)) {
+          return "IFGR";
+       } else {
+          SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting string for gain_ctrl_mode");
+          return "";
+       }
+       
+    }
 
-    // SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());
+    SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());
     return "";
 }
 
