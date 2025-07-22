@@ -598,6 +598,10 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
    {
       return chParams->tunerParams.gain.LNAstate;
    }
+   else if (name == "CURRENT")
+   {
+      return chParams->tunerParams.gain.gainVals.curr;
+   }
 
    return 0;
 }
