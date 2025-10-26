@@ -503,6 +503,7 @@ std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size
 
     results.push_back("IFGR");
     results.push_back("RFGR");
+    results.push_back("CURRENT");
 
     return results;
 }
@@ -562,6 +563,10 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
           chParams->tunerParams.gain.LNAstate = (int)value;
           doUpdate = true;
       }
+   }
+   else if (name == "CURRENT")
+   {
+      throw std::runtime_error("setGain(CURRENT) is not supported");
    }
    if ((doUpdate == true) && (streamActive))
    {
