@@ -535,6 +535,11 @@ bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
     return chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
 }
 
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+{
+   throw std::runtime_error("setGain() requires a gain name");
+}
+
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
@@ -589,6 +594,11 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
          SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
       }
    }
+}
+
+double SoapySDRPlay::getGain(const int direction, const size_t channel) const
+{
+   return getGain(direction, channel, "CURRENT");
 }
 
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
