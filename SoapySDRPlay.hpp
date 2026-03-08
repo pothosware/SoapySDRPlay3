@@ -225,6 +225,10 @@ public:
 
     void writeSetting(const std::string &key, const std::string &value);
 
+    void writeChannelSetting(const int direction, const size_t channel, const std::string &key, const std::string &value);
+
+    std::string readChannelSetting(const int direction, const size_t channel, const std::string &key) const;
+
     void changeRspDuoMode(const std::string &rspDuoModeString,
                           bool resetDevice);
 
@@ -272,6 +276,9 @@ private:
                       double rspDuoSampleFreq,
                       sdrplay_api_DeviceParamsT *thisDeviceParams);
 
+    sdrplay_api_RxChannelParamsT *getChParams(const size_t channel) const;
+    sdrplay_api_TunerSelectT getChTuner(const size_t channel) const;
+
     void releaseDevice();
 
 #ifdef SHOW_SERIAL_NUMBER_IN_MESSAGES
@@ -287,6 +294,7 @@ private:
     sdrplay_api_DeviceT device;
     sdrplay_api_DeviceParamsT *deviceParams;
     sdrplay_api_RxChannelParamsT *chParams;
+    bool rspDuoDualTunerIndependentRx;
     int hwVer;
     std::string serNo;
     std::string cacheKey;
