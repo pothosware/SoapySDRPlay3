@@ -105,7 +105,7 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq,
     }
 
     int spaceReqd = numSamples * elementsPerSample * shortsPerWord;
-    if ((stream->buffs[stream->tail].size() + spaceReqd) >= (bufferLength / chParams->ctrlParams.decimation.decimationFactor))
+    if ((stream->buffs[stream->tail].size() + spaceReqd) >= (bufferLength / getChParams(stream->channel)->ctrlParams.decimation.decimationFactor))
     {
        // increment the tail pointer and buffer count
        stream->tail = (stream->tail + 1) % numBuffers;
@@ -193,7 +193,13 @@ void SoapySDRPlay::ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSele
     }
     else if (eventId == sdrplay_api_RspDuoModeChange)
     {
-        if (params->rspDuoModeParams.modeChangeType == sdrplay_api_MasterDllDisappeared)
+        if (params->rspDuoModeParams.modeChangeType == sdrplay_api_MasterInitialised)
+        {
+            // Master Init complete -- Slave may now call sdrplay_api_SelectDevice()
+            SoapySDR_log(SOAPY_SDR_INFO, "RSPduo Master initialised; Slave can now SelectDevice.");
+            master_initialised = true;
+        }
+        else if (params->rspDuoModeParams.modeChangeType == sdrplay_api_MasterDllDisappeared)
         {
             // Notify readStream() that the master stream has been removed
             // so that the application can be closed gracefully
@@ -359,6 +365,14 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     chParams->tunerParams.dcOffsetTuner.dcCal = 4;
     chParams->tunerParams.dcOffsetTuner.speedUp = 0;
     chParams->tunerParams.dcOffsetTuner.trackTime = 63;
+    if (device.hwVer == SDRPLAY_RSPduo_ID &&
+        device.rspDuoMode == sdrplay_api_RspDuoMode_Dual_Tuner &&
+        rspDuoDualTunerIndependentRx)
+    {
+        deviceParams->rxChannelB->tunerParams.dcOffsetTuner.dcCal = 4;
+        deviceParams->rxChannelB->tunerParams.dcOffsetTuner.speedUp = 0;
+        deviceParams->rxChannelB->tunerParams.dcOffsetTuner.trackTime = 63;
+    }
 
     sdrplay_api_CallbackFnsT cbFns;
     cbFns.StreamACbFn = _rx_callback_A;

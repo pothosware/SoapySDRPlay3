@@ -330,6 +330,10 @@ private:
     bool device_unavailable;
     const int updateTimeout = 500;   // 500ms timeout for updates
 
+    // set by ev_callback when sdrplay_api_MasterInitialised fires; signals
+    // that the Slave device can now call sdrplay_api_SelectDevice()
+    std::atomic_bool master_initialised;
+
 public:
 
    /*******************************************************************

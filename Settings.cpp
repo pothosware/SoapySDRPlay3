@@ -90,6 +90,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
     device_unavailable = false;
 
+    master_initialised = false;
+
     cacheKey = serNo;
     if (hwVer == SDRPLAY_RSPduo_ID) cacheKey += "@" + args.at("mode");
     SoapySDRPlay_getClaimedSerials().insert(cacheKey);
@@ -1712,6 +1714,33 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
          }
       }
    }
+   else if (key == "rfnotch_ctrl_ch1")
+   {
+      // DT-IR only: enable/disable the FM notch filter on Tuner B (channel 1)
+      // without affecting Tuner A (channel 0), which may need to receive FM.
+      if (device.hwVer == SDRPLAY_RSPduo_ID && rspDuoDualTunerIndependentRx &&
+          deviceParams->rxChannelB)
+      {
+         unsigned char notchEn = (value == "false") ? 0 : 1;
+         deviceParams->rxChannelB->rspDuoTunerParams.rfNotchEnable = notchEn;
+         if (streamActive)
+         {
+            sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, sdrplay_api_Tuner_B,
+                sdrplay_api_Update_RspDuo_RfNotchControl,
+                sdrplay_api_Update_Ext1_None);
+            if (err != sdrplay_api_Success)
+            {
+               SoapySDR_logf(SOAPY_SDR_WARNING, "rfnotch_ctrl_ch1 update Error: %s",
+                   sdrplay_api_GetErrorString(err));
+            }
+         }
+      }
+      else
+      {
+         SoapySDR_logf(SOAPY_SDR_WARNING,
+             "rfnotch_ctrl_ch1 is only supported for RSPduo in DT-IR mode");
+      }
+   }
    else if (key == "rfnotch_ctrl")
    {
       unsigned char notchEn;
@@ -1844,7 +1873,22 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     }
     else
 #endif
-    if (key == "iqcorr_ctrl")
+    if (key == "master_initialised")
+    {
+        // RSPduo Master/Slave mode: returns "true" once the sdrplay_api_MasterInitialised
+        // event has been received, signalling that the Slave can call SelectDevice().
+        return master_initialised.load() ? "true" : "false";
+    }
+    else if (key == "rfnotch_ctrl_ch1")
+    {
+       if (device.hwVer == SDRPLAY_RSPduo_ID && rspDuoDualTunerIndependentRx &&
+           deviceParams->rxChannelB)
+       {
+          return deviceParams->rxChannelB->rspDuoTunerParams.rfNotchEnable ? "true" : "false";
+       }
+       return "false";
+    }
+    else if (key == "iqcorr_ctrl")
     {
        if (chParams->ctrlParams.dcOffset.IQenable == 0) return "false";
        else                                             return "true";
