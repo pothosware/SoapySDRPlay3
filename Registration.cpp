@@ -41,6 +41,12 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 
    std::string baseLabel = "SDRplay Dev";
 
+   bool isDualTunerIndependentRxHint = false;
+   if (args.count("rspduo_dual_tuner_independent_rx") != 0)
+   {
+      isDualTunerIndependentRxHint = args.at("rspduo_dual_tuner_independent_rx") == "true";
+   }
+
    // list devices by API
    SoapySDRPlay::sdrplay_api::get_instance();
    sdrplay_api_LockDeviceApi();
@@ -109,13 +115,29 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Dual_Tuner)
       {
          dev["mode"] = "DT";
-         const bool modeMatch = args.count("mode") == 0 or args.at("mode") == dev["mode"];
+         const bool modeMatch = (args.count("mode") == 0 or args.at("mode") == dev["mode"]) &&
+                                !isDualTunerIndependentRxHint;
          if (modeMatch)
          {
             sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Dual Tuner", results.size(), modelName.c_str(), rspDevs[i].SerNo);
             dev["label"] = lblstr;
             results.push_back(dev);
             _cachedResults[dev["serial"] + "@" + dev["mode"]] = dev;
+         }
+      }
+      if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Dual_Tuner)
+      {
+         SoapySDR::Kwargs dtir_dev = dev;
+         dtir_dev["mode"] = "DT-IR";
+         dtir_dev["rspduo_dual_tuner_independent_rx"] = "true";
+         const bool modeMatch = (args.count("mode") == 0 or args.at("mode") == dtir_dev["mode"]) &&
+                                (isDualTunerIndependentRxHint || args.count("rspduo_dual_tuner_independent_rx") == 0);
+         if (modeMatch)
+         {
+            sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%ld %s %s - Dual Tuner (independent RX)", results.size(), modelName.c_str(), rspDevs[i].SerNo);
+            dtir_dev["label"] = lblstr;
+            results.push_back(dtir_dev);
+            _cachedResults[dtir_dev["serial"] + "@DT-IR"] = dtir_dev;
          }
       }
       if (rspDevs[i].rspDuoMode & sdrplay_api_RspDuoMode_Master)
