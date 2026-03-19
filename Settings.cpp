@@ -1556,7 +1556,7 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        RfNotchArg.value = "true";
        RfNotchArg.name = "RfNotch Enable";
        RfNotchArg.description = "RF Notch Filter Control";
-       RfNotchArg.type = SoapySDR::ArgInfo::BOOL;
+       RfNotchArg.type = SoapySDR::ArgInfo::STRING;
        setArgs.push_back(RfNotchArg);
 
        SoapySDR::ArgInfo DabNotchArg;
@@ -1564,7 +1564,7 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        DabNotchArg.value = "true";
        DabNotchArg.name = "DabNotch Enable";
        DabNotchArg.description = "DAB Notch Filter Control";
-       DabNotchArg.type = SoapySDR::ArgInfo::BOOL;
+       DabNotchArg.type = SoapySDR::ArgInfo::STRING;
        setArgs.push_back(DabNotchArg);
     }
     else if (device.hwVer == SDRPLAY_RSP1A_ID || device.hwVer == SDRPLAY_RSP1B_ID) // RSP1A and RSP1B
@@ -1802,22 +1802,43 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       }
       else if (device.hwVer == SDRPLAY_RSPduo_ID)
       {
-        if (device.tuner == sdrplay_api_Tuner_A && chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_1)
-        {
-          chParams->rspDuoTunerParams.tuner1AmNotchEnable = notchEn;
-          if (streamActive)
-          {
-             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_RspDuo_Tuner1AmNotchControl, sdrplay_api_Update_Ext1_None);
-          }
-        }
-        if (chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_2)
-        {
-          chParams->rspDuoTunerParams.rfNotchEnable = notchEn;
-          if (streamActive)
-          {
-             sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_RspDuo_RfNotchControl, sdrplay_api_Update_Ext1_None);
-          }
-        }
+         if (value == "false" || value == "0") notchEn = 0;
+         else                                  notchEn = 1;
+         if (!(value == "A" || value == "B"))
+         {
+            if (device.tuner == sdrplay_api_Tuner_A && chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_1)
+            {
+               chParams->rspDuoTunerParams.tuner1AmNotchEnable = notchEn;
+               if (streamActive)
+               {
+                  sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_RspDuo_Tuner1AmNotchControl, sdrplay_api_Update_Ext1_None);
+               }
+            }
+            if (chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_2)
+            {
+               chParams->rspDuoTunerParams.rfNotchEnable = notchEn;
+               if (streamActive)
+               {
+                  sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_RspDuo_RfNotchControl, sdrplay_api_Update_Ext1_None);
+               }
+            }
+         }
+         else if (device.tuner == sdrplay_api_Tuner_Both)
+         {
+            int channel = value == "A" ? 0 : 1;
+            if (tunerDT[0] == tunerDT[1])
+            {
+               tunerDT[0] = sdrplay_api_Tuner_A;
+               tunerDT[1] = sdrplay_api_Tuner_B;
+               chParamsDT[0] = deviceParams->rxChannelA;
+               chParamsDT[1] = deviceParams->rxChannelB;
+            }
+            chParamsDT[channel]->rspDuoTunerParams.rfNotchEnable = notchEn;
+            if (streamActive)
+            {
+               sdrplay_api_Update(device.dev, tunerDT[channel], sdrplay_api_Update_RspDuo_RfNotchControl, sdrplay_api_Update_Ext1_None);
+            }
+         }
       }
       else if (device.hwVer == SDRPLAY_RSP1A_ID || device.hwVer == SDRPLAY_RSP1B_ID)
       {
@@ -1851,10 +1872,31 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       else                  dabNotchEn = 1;
       if (device.hwVer == SDRPLAY_RSPduo_ID)
       {
-         chParams->rspDuoTunerParams.rfDabNotchEnable = dabNotchEn;
-         if (streamActive)
+         if (value == "false" || value == "0") dabNotchEn = 0;
+         else                                  dabNotchEn = 1;
+         if (!(value == "A" || value == "B"))
          {
-            sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_RspDuo_RfDabNotchControl, sdrplay_api_Update_Ext1_None);
+            chParams->rspDuoTunerParams.rfDabNotchEnable = dabNotchEn;
+            if (streamActive)
+            {
+               sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_RspDuo_RfDabNotchControl, sdrplay_api_Update_Ext1_None);
+            }
+         }
+         else if (device.tuner == sdrplay_api_Tuner_Both)
+         {
+            int channel = value == "A" ? 0 : 1;
+            if (tunerDT[0] == tunerDT[1])
+            {
+               tunerDT[0] = sdrplay_api_Tuner_A;
+               tunerDT[1] = sdrplay_api_Tuner_B;
+               chParamsDT[0] = deviceParams->rxChannelA;
+               chParamsDT[1] = deviceParams->rxChannelB;
+            }
+            chParamsDT[channel]->rspDuoTunerParams.rfDabNotchEnable = dabNotchEn;
+            if (streamActive)
+            {
+               sdrplay_api_Update(device.dev, tunerDT[channel], sdrplay_api_Update_RspDuo_RfDabNotchControl, sdrplay_api_Update_Ext1_None);
+            }
          }
       }
       if (device.hwVer == SDRPLAY_RSP1A_ID || device.hwVer == SDRPLAY_RSP1B_ID)
@@ -1959,13 +2001,32 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        if (device.hwVer == SDRPLAY_RSP2_ID) notchEn = chParams->rsp2TunerParams.rfNotchEnable;
        else if (device.hwVer == SDRPLAY_RSPduo_ID)
        {
-          if (device.tuner == sdrplay_api_Tuner_A && chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_1)
+          if (tunerDT[0] == tunerDT[1])
           {
-             notchEn = chParams->rspDuoTunerParams.tuner1AmNotchEnable;
+             if (device.tuner == sdrplay_api_Tuner_A && chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_1)
+             {
+                notchEn = chParams->rspDuoTunerParams.tuner1AmNotchEnable;
+             }
+             if (chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_2)
+             {
+                notchEn = chParams->rspDuoTunerParams.rfNotchEnable;
+             }
           }
-          if (chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_2)
+          else
           {
-             notchEn = chParams->rspDuoTunerParams.rfNotchEnable;
+             if (chParamsDT[0]->rspDuoTunerParams.rfNotchEnable == 0) {
+                if (chParamsDT[1]->rspDuoTunerParams.rfNotchEnable == 0) {
+                   notchEn = 0;
+                } else {
+                   return "B";
+                }
+             } else {
+                if (chParamsDT[1]->rspDuoTunerParams.rfNotchEnable == 0) {
+                   return "A";
+                } else {
+                   notchEn = 1;
+                }
+             }
           }
        }
        else if (device.hwVer == SDRPLAY_RSP1A_ID || device.hwVer == SDRPLAY_RSP1B_ID) notchEn = deviceParams->devParams->rsp1aParams.rfNotchEnable;
@@ -1977,7 +2038,29 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     else if (key == "dabnotch_ctrl")
     {
        unsigned char dabNotchEn = 0;
-       if (device.hwVer == SDRPLAY_RSPduo_ID) dabNotchEn = chParams->rspDuoTunerParams.rfDabNotchEnable;
+       if (device.hwVer == SDRPLAY_RSPduo_ID)
+       {
+          if (tunerDT[0] == tunerDT[1])
+          {
+             dabNotchEn = chParams->rspDuoTunerParams.rfDabNotchEnable;
+          }
+          else
+          {
+             if (chParamsDT[0]->rspDuoTunerParams.rfDabNotchEnable == 0) {
+                if (chParamsDT[1]->rspDuoTunerParams.rfDabNotchEnable == 0) {
+                   dabNotchEn = 0;
+                } else {
+                   return "B";
+                }
+             } else {
+                if (chParamsDT[1]->rspDuoTunerParams.rfDabNotchEnable == 0) {
+                   return "A";
+                } else {
+                   dabNotchEn = 1;
+                }
+             }
+          }
+       }
        else if (device.hwVer == SDRPLAY_RSP1A_ID || device.hwVer == SDRPLAY_RSP1B_ID) dabNotchEn = deviceParams->devParams->rsp1aParams.rfDabNotchEnable;
        else if (device.hwVer == SDRPLAY_RSPdx_ID) dabNotchEn = deviceParams->devParams->rspDxParams.rfDabNotchEnable;
        else if (device.hwVer == SDRPLAY_RSPdxR2_ID) dabNotchEn = deviceParams->devParams->rspDxParams.rfDabNotchEnable;
