@@ -1,3 +1,10 @@
+Unreleased
+==========================
+
+- True dual channel operation for the RSPduo in Dual Tuner mode: one stream
+  carrying both tuners, sample aligned, and per channel control of gain, AGC,
+  antenna, bandwidth and the tuner settings
+
 Release 0.5.2 (2024-05-30)
 ==========================
 

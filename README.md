@@ -11,6 +11,40 @@
 * SDRplay API - download (and install) SDRplay API from - https://www.sdrplay.com/downloads - NOTE: the current version of this module requires SDRplay API V3.15 or later
 * SoapySDR - https://github.com/pothosware/SoapySDR/wiki
 
+## RSPduo Dual Tuner mode
+
+Open the device with `mode=DT` to run both tuners at once:
+
+```
+SoapySDRUtil --probe="driver=sdrplay,serial=<serial>,mode=DT"
+```
+
+The device then has two receive channels, and both of them can be carried by
+one stream:
+
+```c++
+device->setupStream(SOAPY_SDR_RX, "CF32", {0, 1});
+```
+
+`readStream()` fills one buffer per channel and the two are sample aligned: the
+tuners deliver their samples in matched pairs and the driver keeps the pairing
+all the way to the caller's buffers, which is what diversity reception needs.
+Setting the two channels up as two separate streams still works and is still
+what a single tuner mode gives you, but two streams are read one after the
+other and nothing keeps them in step.
+
+Channel 0 is tuner A ("Tuner 1 50 ohm") and channel 1 is tuner B ("Tuner 2 50
+ohm"); neither can be swapped or moved to the Hi-Z port while both are running.
+The gain, the AGC, the bandwidth, the DC/IQ correction and the tuner settings
+(`biasT_ctrl`, `rfnotch_ctrl`, `dabnotch_ctrl`, `agc_setpoint`, `iqcorr_ctrl`)
+are each channel's own, through the per channel `writeSetting()`. The device
+wide `writeSetting()` writes both channels, so an application that knows
+nothing of the second tuner still configures the pair the same way.
+
+The sample rate is the converter's rather than a tuner's, so it moves both
+channels together. Dual Tuner mode runs at a low IF and offers 62.5 kHz to
+2 MHz.
+
 ## Troubleshooting
 
 This section contains some useful information for troubleshhoting

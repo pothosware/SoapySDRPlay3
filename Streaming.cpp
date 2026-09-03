@@ -58,14 +58,14 @@ static void _rx_callback_A(short *xi, short *xq, sdrplay_api_StreamCbParamsT *pa
                            unsigned int numSamples, unsigned int reset, void *cbContext)
 {
     SoapySDRPlay *self = (SoapySDRPlay *)cbContext;
-    return self->rx_callback(xi, xq, params, numSamples, self->_streams[0]);
+    return self->rx_callback(xi, xq, params, numSamples, 0);
 }
 
 static void _rx_callback_B(short *xi, short *xq, sdrplay_api_StreamCbParamsT *params,
                            unsigned int numSamples, unsigned int reset, void *cbContext)
 {
     SoapySDRPlay *self = (SoapySDRPlay *)cbContext;
-    return self->rx_callback(xi, xq, params, numSamples, self->_streams[1]);
+    return self->rx_callback(xi, xq, params, numSamples, 1);
 }
 
 static void _ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner,
@@ -78,12 +78,31 @@ static void _ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tu
 void SoapySDRPlay::rx_callback(short *xi, short *xq,
                                sdrplay_api_StreamCbParamsT *params,
                                unsigned int numSamples,
-                               SoapySDRPlayStream *stream)
+                               size_t channel)
 {
+    SoapySDRPlayStream *stream = _streams[channel];
     if (stream == 0) {
         return;
     }
     std::lock_guard<std::mutex> lock(stream->mutex);
+
+    int index = stream->indexOf(channel);
+    if (index < 0) {
+        return;
+    }
+    auto &chan = stream->chans[index];
+
+    // A drop the reader asked for happens here, at the boundary between one
+    // block and the next, so that every channel comes back from it holding the
+    // same block - see SoapySDRPlayStream::drainPending.
+    if (stream->delivered == 0 && stream->drainPending)
+    {
+        stream->drain();
+        stream->drainPending = false;
+    }
+    // counted whether or not this block is kept, so that an overflowing
+    // channel does not take the boundary with it
+    stream->delivered = (stream->delivered + 1) % stream->chans.size();
 
     if (gr_changed == 0 && params->grChanged != 0)
     {
@@ -98,21 +117,21 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq,
         fs_changed = params->fsChanged;
     }
 
-    if (stream->count == numBuffers)
+    if (chan.count == numBuffers)
     {
         stream->overflowEvent = true;
         return;
     }
 
     int spaceReqd = numSamples * elementsPerSample * shortsPerWord;
-    if ((stream->buffs[stream->tail].size() + spaceReqd) >= (bufferLength / chParams->ctrlParams.decimation.decimationFactor))
+    if ((chan.buffs[chan.tail].size() + spaceReqd) >= (bufferLength / getChannelParams(channel)->ctrlParams.decimation.decimationFactor))
     {
        // increment the tail pointer and buffer count
-       stream->tail = (stream->tail + 1) % numBuffers;
-       stream->count++;
+       chan.tail = (chan.tail + 1) % numBuffers;
+       chan.count++;
 
-       auto &buff = stream->buffs[stream->tail];
-       if (stream->count == numBuffers && (size_t) spaceReqd > buff.capacity() - buff.size())
+       auto &buff = chan.buffs[chan.tail];
+       if (chan.count == numBuffers && (size_t) spaceReqd > buff.capacity() - buff.size())
        {
            stream->overflowEvent = true;
            return;
@@ -123,7 +142,14 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq,
     }
 
     // get current fill buffer
-    auto &buff = stream->buffs[stream->tail];
+    auto &buff = chan.buffs[chan.tail];
+
+    // a slot that is being started remembers where it starts, so that the two
+    // rings of a dual tuner stream can be checked against each other
+    if (buff.empty())
+    {
+       chan.firstSampleNum[chan.tail] = params->firstSampleNum;
+    }
 
     // we do not reallocate here, as we only resize within
     // the buffers capacity
@@ -207,26 +233,80 @@ void SoapySDRPlay::ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSele
  * Stream API
  ******************************************************************/
 
-SoapySDRPlay::SoapySDRPlayStream::SoapySDRPlayStream(size_t channel,
+SoapySDRPlay::SoapySDRPlayStream::Channel::Channel(size_t numBuffers,
+                                                   unsigned long bufferLength)
+{
+    // clear async fifo counts
+    tail = 0;
+    count = 0;
+    currentBuff = 0;
+
+    // allocate buffers
+    buffs.resize(numBuffers);
+    for (auto &buff : buffs) buff.reserve(bufferLength);
+    firstSampleNum.resize(numBuffers, 0);
+}
+
+SoapySDRPlay::SoapySDRPlayStream::SoapySDRPlayStream(const std::vector<size_t> &channels,
                                                      size_t numBuffers,
                                                      unsigned long bufferLength)
 {
     std::lock_guard<std::mutex> lock(mutex);
 
-    this->channel = channel;
+    this->channels = channels;
 
-    // clear async fifo counts
-    tail = 0;
     head = 0;
-    count = 0;
+    overflowEvent = false;
+    nElems = 0;
+    currentHandle = 0;
+    reset = false;
+    drainPending = false;
+    delivered = 0;
 
-    // allocate buffers
-    buffs.resize(numBuffers);
-    for (auto &buff : buffs) buff.reserve(bufferLength);
+    for (size_t i = 0; i < channels.size(); ++i)
+    {
+       chans.push_back(Channel(numBuffers, bufferLength));
+    }
 }
 
 SoapySDRPlay::SoapySDRPlayStream::~SoapySDRPlayStream()
 {
+}
+
+int SoapySDRPlay::SoapySDRPlayStream::indexOf(size_t channel) const
+{
+    for (size_t i = 0; i < channels.size(); ++i)
+    {
+       if (channels[i] == channel) return (int)i;
+    }
+    return -1;
+}
+
+size_t SoapySDRPlay::SoapySDRPlayStream::readyCount(void) const
+{
+    size_t ready = chans.empty() ? 0 : chans.front().count;
+    for (const auto &chan : chans) ready = std::min(ready, chan.count);
+    return ready;
+}
+
+bool SoapySDRPlay::SoapySDRPlayStream::slotsAligned(size_t slot) const
+{
+    for (const auto &chan : chans)
+    {
+       if (chan.firstSampleNum[slot] != chans.front().firstSampleNum[slot]) return false;
+    }
+    return true;
+}
+
+void SoapySDRPlay::SoapySDRPlayStream::drain(void)
+{
+    head = 0;
+    for (auto &chan : chans)
+    {
+       chan.tail = 0;
+       chan.count = 0;
+       for (auto &buff : chan.buffs) buff.clear();
+    }
 }
 
 SoapySDR::Stream *SoapySDRPlay::setupStream(const int direction,
@@ -234,12 +314,31 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(const int direction,
                                             const std::vector<size_t> &channels,
                                             const SoapySDR::Kwargs &args)
 {
-    size_t nchannels = device.hwVer == SDRPLAY_RSPduo_ID && device.rspDuoMode == sdrplay_api_RspDuoMode_Dual_Tuner ? 2 : 1;
+    size_t nchannels = isDualTuner() ? 2 : 1;
 
-    // check the channel configuration
-    if (channels.size() > 1 or (channels.size() > 0 and channels.at(0) >= nchannels))
+    // check the channel configuration. Both channels in one stream is what
+    // makes the RSPduo's two tuners usable for diversity reception: they are
+    // then read together and stay sample aligned, which two streams read one
+    // after the other cannot be.
+    std::vector<size_t> streamChannels = channels;
+    if (streamChannels.empty()) streamChannels.push_back(0);
+    if (streamChannels.size() > nchannels)
     {
        throw std::runtime_error("setupStream invalid channel selection");
+    }
+    for (size_t i = 0; i < streamChannels.size(); ++i)
+    {
+       if (streamChannels[i] >= nchannels)
+       {
+          throw std::runtime_error("setupStream invalid channel selection");
+       }
+       for (size_t j = 0; j < i; ++j)
+       {
+          if (streamChannels[j] == streamChannels[i])
+          {
+             throw std::runtime_error("setupStream duplicate channel selection");
+          }
+       }
     }
 
     // check the format
@@ -263,12 +362,12 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(const int direction,
                                   "' -- Only CS16 or CF32 are supported by the SoapySDRPlay module.");
     }
 
-    // default is channel 0
-    size_t channel = channels.size() == 0 ? 0 : channels.at(0);
-    SoapySDRPlayStream *sdrplay_stream = _streams[channel];
-    if (sdrplay_stream == 0)
+    // reuse the stream already carrying exactly these channels, the way the
+    // single channel case did - SoapySDR remote sets a stream up more than once
+    SoapySDRPlayStream *sdrplay_stream = _streams[streamChannels.front()];
+    if (sdrplay_stream == 0 || sdrplay_stream->channels != streamChannels)
     {
-        sdrplay_stream = new SoapySDRPlayStream(channel, numBuffers, bufferLength);
+        sdrplay_stream = new SoapySDRPlayStream(streamChannels, numBuffers, bufferLength);
     }
     return reinterpret_cast<SoapySDR::Stream *>(sdrplay_stream);
 }
@@ -339,8 +438,11 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
 
     sdrplay_stream->reset = true;
     sdrplay_stream->nElems = 0;
-    _streams[sdrplay_stream->channel] = sdrplay_stream;
-    _streamsRefCount[sdrplay_stream->channel]++;
+    for (size_t channel : sdrplay_stream->channels)
+    {
+        _streams[channel] = sdrplay_stream;
+        _streamsRefCount[channel]++;
+    }
 
     if (streamActive)
     {
@@ -356,9 +458,18 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     sdrplay_api_DebugEnable(device.dev, sdrplay_api_DbgLvl_Disable);
     //sdrplay_api_DebugEnable(device.dev, sdrplay_api_DbgLvl_Verbose);
 
-    chParams->tunerParams.dcOffsetTuner.dcCal = 4;
-    chParams->tunerParams.dcOffsetTuner.speedUp = 0;
-    chParams->tunerParams.dcOffsetTuner.trackTime = 63;
+    for (size_t channel : getAllChannels())
+    {
+        sdrplay_api_RxChannelParamsT *params = getChannelParams(channel);
+        params->tunerParams.dcOffsetTuner.dcCal = 4;
+        params->tunerParams.dcOffsetTuner.speedUp = 0;
+        params->tunerParams.dcOffsetTuner.trackTime = 63;
+    }
+
+    // Init() copies channel A over channel B, so what the second tuner was
+    // configured with has to be kept here and written back afterwards.
+    sdrplay_api_RxChannelParamsT tunerB;
+    if (isDualTuner()) tunerB = *deviceParams->rxChannelB;
 
     sdrplay_api_CallbackFnsT cbFns;
     cbFns.StreamACbFn = _rx_callback_A;
@@ -378,6 +489,8 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     }
 
     streamActive = true;
+
+    if (isDualTuner()) restoreTunerB(tunerB);
 
     return 0;
 }
@@ -412,7 +525,7 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
     }
 
     SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
-    if (_streams[sdrplay_stream->channel] == 0)
+    if (_streams[sdrplay_stream->channels.front()] == 0)
     {
         //throw std::runtime_error("readStream stream not activated");
         return SOAPY_SDR_NOT_SUPPORTED;
@@ -421,10 +534,13 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
     // fv
     std::lock_guard <std::mutex> lock(sdrplay_stream->anotherMutex);
 
+    size_t nchans = sdrplay_stream->chans.size();
+
     // are elements left in the buffer? if not, do a new read.
     if (sdrplay_stream->nElems == 0)
     {
-        int ret = this->acquireReadBuffer(stream, sdrplay_stream->currentHandle, (const void **)&sdrplay_stream->currentBuff, flags, timeNs, timeoutUs);
+        const void *acquired[2] = { 0, 0 };
+        int ret = this->acquireReadBuffer(stream, sdrplay_stream->currentHandle, acquired, flags, timeNs, timeoutUs);
 
         if (ret < 0)
         {
@@ -432,29 +548,38 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
             //SoapySDR_logf(SOAPY_SDR_WARNING, "readStream() failed: %s", SoapySDR_errToStr(ret));
             return ret;
         }
+        for (size_t i = 0; i < nchans; ++i)
+        {
+            sdrplay_stream->chans[i].currentBuff = (short *)(void *)acquired[i];
+        }
         sdrplay_stream->nElems = ret;
     }
 
     size_t returnedElems = std::min(sdrplay_stream->nElems.load(), numElems);
 
-    // copy into user's buff - always write to buffs[0] since each stream
-    // can have only one rx/channel
-    if (useShort)
+    // copy into the caller's buffers, one per channel of this stream
+    for (size_t i = 0; i < nchans; ++i)
     {
-        std::memcpy(buffs[0], sdrplay_stream->currentBuff, returnedElems * 2 * sizeof(short));
-    }
-    else
-    {
-        std::memcpy(buffs[0], (float *)(void*)sdrplay_stream->currentBuff, returnedElems * 2 * sizeof(float));
+        if (useShort)
+        {
+            std::memcpy(buffs[i], sdrplay_stream->chans[i].currentBuff, returnedElems * 2 * sizeof(short));
+        }
+        else
+        {
+            std::memcpy(buffs[i], (float *)(void*)sdrplay_stream->chans[i].currentBuff, returnedElems * 2 * sizeof(float));
+        }
     }
 
     // bump variables for next call into readStream
     sdrplay_stream->nElems -= returnedElems;
 
-    // scope lock here to update stream->currentBuff position
+    // scope lock here to update the per channel currentBuff positions
     {
         std::lock_guard <std::mutex> lock(sdrplay_stream->mutex);
-        sdrplay_stream->currentBuff += returnedElems * elementsPerSample * shortsPerWord;
+        for (auto &chan : sdrplay_stream->chans)
+        {
+            chan.currentBuff += returnedElems * elementsPerSample * shortsPerWord;
+        }
     }
 
     // return number of elements written to buff
@@ -477,15 +602,18 @@ size_t SoapySDRPlay::getNumDirectAccessBuffers(SoapySDR::Stream *stream)
 {
     SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
     std::lock_guard <std::mutex> lockA(sdrplay_stream->mutex);
-    return sdrplay_stream->buffs.size();
+    return sdrplay_stream->chans.front().buffs.size();
 }
 
 int SoapySDRPlay::getDirectAccessBufferAddrs(SoapySDR::Stream *stream, const size_t handle, void **buffs)
 {
     SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
     std::lock_guard <std::mutex> lockA(sdrplay_stream->mutex);
-    // always write to buffs[0] since each stream can have only one rx/channel
-    buffs[0] = (void *)sdrplay_stream->buffs[handle].data();
+    // one buffer per channel of the stream, all covering the same samples
+    for (size_t i = 0; i < sdrplay_stream->chans.size(); ++i)
+    {
+        buffs[i] = (void *)sdrplay_stream->chans[i].buffs[handle].data();
+    }
     return 0;
 }
 
@@ -502,30 +630,32 @@ int SoapySDRPlay::acquireReadBuffer(SoapySDR::Stream *stream,
 
     // reset is issued by various settings
     // overflow set in the rx callback thread
-    if (sdrplay_stream->reset || sdrplay_stream->overflowEvent)
+    if (sdrplay_stream->reset.exchange(false) || sdrplay_stream->overflowEvent)
     {
-        // drain all buffers from the fifo
-        sdrplay_stream->tail = 0;
-        sdrplay_stream->head = 0;
-        sdrplay_stream->count = 0;
-        for (auto &buff : sdrplay_stream->buffs) buff.clear();
+        // ask the callbacks to drop everything buffered, which they do at the
+        // next block boundary rather than here - see drainPending
+        bool overflow = sdrplay_stream->overflowEvent;
         sdrplay_stream->overflowEvent = false;
-        if (sdrplay_stream->reset)
-        {
-           sdrplay_stream->reset = false;
-        }
-        else
+        sdrplay_stream->drainPending = true;
+        if (overflow)
         {
            SoapySDR_log(SOAPY_SDR_SSI, "O");
            return SOAPY_SDR_OVERFLOW;
         }
     }
 
-    // wait for a buffer to become available
-    if (sdrplay_stream->count == 0)
+    // nothing may be handed out until that drop has happened, or it would be
+    // samples from before whatever the reset was for
+    if (sdrplay_stream->drainPending)
+    {
+        return SOAPY_SDR_TIMEOUT;
+    }
+
+    // wait for a buffer to become available on every channel
+    if (sdrplay_stream->readyCount() == 0)
     {
         sdrplay_stream->cond.wait_for(lock, std::chrono::microseconds(timeoutUs));
-        if (sdrplay_stream->count == 0)
+        if (sdrplay_stream->readyCount() == 0)
         {
            return SOAPY_SDR_TIMEOUT;
         }
@@ -539,20 +669,45 @@ int SoapySDRPlay::acquireReadBuffer(SoapySDR::Stream *stream,
 
     // extract handle and buffer
     handle = sdrplay_stream->head;
-    // always write to buffs[0] since each stream can have only one rx/channel
-    buffs[0] = (void *)sdrplay_stream->buffs[handle].data();
+
+    // The two tuners deliver their samples in matched pairs, so a slot that
+    // does not begin at the same sample number on both channels means the
+    // pairing has been lost. Handing that back would put one channel's samples
+    // beside another moment in time of the other, which is worse than a gap:
+    // everything buffered is dropped and the stream starts pairing again.
+    if (!sdrplay_stream->slotsAligned(handle))
+    {
+       SoapySDR_logf(SOAPY_SDR_WARNING, "dual tuner streams out of step - first sample %u vs %u",
+                     sdrplay_stream->chans[0].firstSampleNum[handle],
+                     sdrplay_stream->chans[1].firstSampleNum[handle]);
+       sdrplay_stream->drainPending = true;
+       return SOAPY_SDR_OVERFLOW;
+    }
+
+    // one buffer per channel of the stream
+    size_t available = 0;
+    for (size_t i = 0; i < sdrplay_stream->chans.size(); ++i)
+    {
+       const auto &buff = sdrplay_stream->chans[i].buffs[handle];
+       buffs[i] = (const void *)buff.data();
+       size_t elems = buff.size() / (elementsPerSample * shortsPerWord);
+       available = i == 0 ? elems : std::min(available, elems);
+    }
     flags = 0;
 
     sdrplay_stream->head = (sdrplay_stream->head + 1) % numBuffers;
 
     // return number available
-    return (int)(sdrplay_stream->buffs[handle].size() / (elementsPerSample * shortsPerWord));
+    return (int)available;
 }
 
 void SoapySDRPlay::releaseReadBuffer(SoapySDR::Stream *stream, const size_t handle)
 {
     SoapySDRPlayStream *sdrplay_stream = reinterpret_cast<SoapySDRPlayStream *>(stream);
     std::lock_guard <std::mutex> lockA(sdrplay_stream->mutex);
-    sdrplay_stream->buffs[handle].clear();
-    sdrplay_stream->count--;
+    for (auto &chan : sdrplay_stream->chans)
+    {
+        chan.buffs[handle].clear();
+        chan.count--;
+    }
 }
