@@ -1,5 +1,7 @@
 # Soapy SDR module for SDRPlay
 
+> **Note:** This module contains AI-generated code.
+
 ## Documentation
 
 * https://github.com/pothosware/SoapySDRPlay/wiki
