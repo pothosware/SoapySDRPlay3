@@ -26,6 +26,44 @@
 
 #include "SoapySDRPlay.hpp"
 
+namespace {
+
+// RAII for sdrplay_api_LockDeviceApi().
+//
+// The device API lock lives in the sdrplay API *service*, not in this process,
+// so every process on the machine shares it. Leaking it does not merely break
+// the caller: it wedges the API for every other application until the service
+// is restarted.
+//
+// The locked region in the SoapySDRPlay constructor can exit through seven
+// throws -- "no sdrplay device matches" plus six RSPduo mode/tuner/rate
+// rejections -- and only the SelectDevice() failure path unlocked before
+// throwing. Any of the other seven left the lock held system-wide. The
+// commonest by far is "no sdrplay device matches", which is what a probe for
+// an absent or already-claimed device hits.
+//
+// unlock() keeps the happy path releasing at exactly the point it always did,
+// while the destructor covers every throw, including any added later.
+struct DeviceApiLock
+{
+    DeviceApiLock() : locked(true) { sdrplay_api_LockDeviceApi(); }
+    ~DeviceApiLock() { unlock(); }
+    void unlock()
+    {
+        if (locked)
+        {
+            locked = false;
+            sdrplay_api_UnlockDeviceApi();
+        }
+    }
+    DeviceApiLock(const DeviceApiLock &) = delete;
+    DeviceApiLock &operator=(const DeviceApiLock &) = delete;
+private:
+    bool locked;
+};
+
+}
+
 #if defined(_M_X64) || defined(_M_IX86)
 #define strcasecmp _stricmp
 #elif defined (__GNUC__)
@@ -2037,7 +2075,7 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     // retrieve hwVer and serNo by API
     unsigned int nDevs = 0;
 
-    sdrplay_api_LockDeviceApi();
+    DeviceApiLock deviceApiLock;
     sdrplay_api_DeviceT rspDevs[SDRPLAY_MAX_DEVICES];
     sdrplay_api_GetDevices(&rspDevs[0], &nDevs, SDRPLAY_MAX_DEVICES);
 
@@ -2112,13 +2150,12 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     err = sdrplay_api_SelectDevice(&device);
     if (err != sdrplay_api_Success)
     {
-        sdrplay_api_UnlockDeviceApi();
         SoapySDR_logf(SOAPY_SDR_ERROR, "SelectDevice Error: %s", sdrplay_api_GetErrorString(err));
         throw std::runtime_error("SelectDevice() failed");
     }
     selectedRSPDevices[rspDeviceId] = &device;
 
-    sdrplay_api_UnlockDeviceApi();
+    deviceApiLock.unlock();
 
     // Enable (= sdrplay_api_DbgLvl_Verbose) API calls tracing,
     // but only for debug purposes due to its performance impact.
