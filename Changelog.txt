@@ -5,6 +5,20 @@ Unreleased
   carrying both tuners, sample aligned, and per channel control of gain, AGC,
   antenna, bandwidth and the tuner settings
 
+- Slots are cut at multiples of the slot size rather than wherever a ring
+  happens to fill. The old rule held only while both tuners were handed
+  identically sized packets; when they were not, the two rings cut in different
+  places and stayed apart, which readStream() could only answer by draining both
+  and returning SOAPY_SDR_OVERFLOW. A packet that straddles a boundary is now
+  split across the two slots instead of going wholly into one, and a ring that
+  has just been drained waits for a boundary before it starts filling again, so
+  both tuners always resume on the same slot.
+
+- Smaller slots: 20480 frames before decimation instead of 65536, and 24 of them
+  instead of 8. A slot is what a reader waits for after a drain, and 33 ms of it
+  was nearly three blocks for an application asking for 12.5 ms at a time. The
+  ring stays about a quarter of a second deep.
+
 Release 0.5.2 (2024-05-30)
 ==========================
 

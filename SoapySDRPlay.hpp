@@ -41,8 +41,20 @@
 
 #include <sdrplay_api.h>
 
-#define DEFAULT_BUFFER_LENGTH     (65536)
-#define DEFAULT_NUM_BUFFERS       (8)
+// Frames in one slot, before decimation. A slot is the unit samples become
+// readable in - readyCount() only counts slots a callback has finished with -
+// so it is also the granularity a reader sees and what it waits for after a
+// drain. At the 2 MHz the low-IF path delivers, and which the roll then divides
+// down along with the rate, this is about 10 ms: close enough to the 12.5 ms
+// block radioInputStage asks for that a read does not routinely wait for nearly
+// three blocks' worth to land at once, which 65536 (33 ms) did.
+//
+// Divisible by every decimation factor up to 32, so that the slot stays a whole
+// number of frames at all of them.
+#define DEFAULT_BUFFER_LENGTH     (20480)
+// Enough of them to keep the ring about a quarter of a second deep, as it was
+// with a third as many slots three times the size.
+#define DEFAULT_NUM_BUFFERS       (24)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
 
 std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
@@ -405,6 +417,14 @@ public:
             /// what the tuner called the first sample of each slot, which is
             /// what the two rings are checked against each other with
             std::vector<unsigned int> firstSampleNum;
+            /// Whether this channel is still waiting for a slot boundary to
+            /// start filling at.
+            ///
+            /// Set while the ring holds nothing, so that a slot never begins in
+            /// the middle of one. Both tuners then start the same slot at the
+            /// same sample even though a packet that straddles the boundary is
+            /// not split the same way on each of them - see rx_callback().
+            bool awaitingBoundary;
             size_t tail;
             /// number of buffers filled and not yet read
             size_t count;

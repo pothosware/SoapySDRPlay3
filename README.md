@@ -11,6 +11,26 @@
 * SDRplay API - download (and install) SDRplay API from - https://www.sdrplay.com/downloads - NOTE: the current version of this module requires SDRplay API V3.15 or later
 * SoapySDR - https://github.com/pothosware/SoapySDR/wiki
 
+## Building for WavViewDX on Linux
+
+```
+./build-linux.sh
+```
+
+That fetches and unpacks the SDRplay API into `external/` (without running its
+installer - the build needs only the headers and the shared object), builds
+against the system SoapySDR (`libsoapysdr-dev`, ABI 0.8), and installs the
+result as `../wavviewdx/src/resources/soapy_modules/libSoapySDRPlay.so`.
+`external/` and `build-linux/` are build products and are not under version
+control.
+
+`libsdrplay_api.so.3` stays a load-time dependency of the module rather than
+something WavViewDX ships: it is SDRplay's to distribute, and it is a library in
+front of a background service, so it has to be the one their installer put on
+the machine. Without it the module does not load and no RSP is found, which is
+the same thing that happens on Windows and what `soapy_lib.py` is written to
+expect.
+
 ## RSPduo Dual Tuner mode
 
 Open the device with `mode=DT` to run both tuners at once:

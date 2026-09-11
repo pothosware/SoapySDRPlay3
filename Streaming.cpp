@@ -117,66 +117,106 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq,
         fs_changed = params->fsChanged;
     }
 
-    if (chan.count == numBuffers)
-    {
-        stream->overflowEvent = true;
-        return;
-    }
+    // Where the slots are cut.
+    //
+    // On the sample number, not on how much this ring happens to have taken -
+    // which is what keeps the two tuners of an RSPduo in step. Their IF AGCs
+    // are independent, so a gain change on one of them makes the API split a
+    // packet on that tuner alone. A boundary drawn where a ring fills then puts
+    // that channel's slots part of a packet away from the other's, and stays
+    // there: every slot after it is misaligned, and acquireReadBuffer() can
+    // only answer that by throwing both rings away and starting again. With the
+    // AGC hunting that happened often enough to stop the stream delivering
+    // anything at all.
+    //
+    // Cut on the sample number, every slot begins at an exact multiple of
+    // slotFrames on both channels however the packets arrived, so the pairing
+    // is sample exact and cannot drift. A packet that straddles a boundary is
+    // split here rather than being put wholly in one slot, because putting it
+    // in one would be the same drift by another route.
+    unsigned int decimation = getChannelParams(channel)->ctrlParams.decimation.decimationFactor;
+    if (decimation < 1) decimation = 1;
+    const unsigned int slotFrames = std::max(1u, bufferElems / decimation);
 
-    int spaceReqd = numSamples * elementsPerSample * shortsPerWord;
-    if ((chan.buffs[chan.tail].size() + spaceReqd) >= (bufferLength / getChannelParams(channel)->ctrlParams.decimation.decimationFactor))
+    unsigned int consumed = 0;
+    while (consumed < numSamples)
     {
-       // increment the tail pointer and buffer count
-       chan.tail = (chan.tail + 1) % numBuffers;
-       chan.count++;
-
-       auto &buff = chan.buffs[chan.tail];
-       if (chan.count == numBuffers && (size_t) spaceReqd > buff.capacity() - buff.size())
+       if (chan.count == numBuffers)
        {
+           // every slot is full and unread; tail has nowhere to go
            stream->overflowEvent = true;
            return;
        }
 
-       // notify readStream()
-       stream->cond.notify_one();
-    }
+       const unsigned int sampleNum = params->firstSampleNum + consumed;
+       const unsigned int offsetInSlot = sampleNum % slotFrames;
+       // never past the next boundary, so one pass fills at most one slot
+       const unsigned int take = std::min(numSamples - consumed, slotFrames - offsetInSlot);
 
-    // get current fill buffer
-    auto &buff = chan.buffs[chan.tail];
-
-    // a slot that is being started remembers where it starts, so that the two
-    // rings of a dual tuner stream can be checked against each other
-    if (buff.empty())
-    {
-       chan.firstSampleNum[chan.tail] = params->firstSampleNum;
-    }
-
-    // we do not reallocate here, as we only resize within
-    // the buffers capacity
-    buff.resize(buff.size() + spaceReqd);
-
-    // copy into the buffer queue
-    unsigned int i = 0;
-
-    if (useShort)
-    {
-       short *dptr = buff.data();
-       dptr += (buff.size() - spaceReqd);
-       for (i = 0; i < numSamples; i++)
+       if (chan.awaitingBoundary)
        {
-           *dptr++ = xi[i];
-           *dptr++ = xq[i];
-        }
-    }
-    else
-    {
-       float *dptr = (float *)buff.data();
-       dptr += ((buff.size() - spaceReqd) / shortsPerWord);
-       for (i = 0; i < numSamples; i++)
-       {
-          *dptr++ = (float)xi[i] / 32768.0f;
-          *dptr++ = (float)xq[i] / 32768.0f;
+          // Nothing is kept until a slot can be started at its first sample.
+          // Costs less than one slot, once, after a drain - and is what lets
+          // both tuners come back from one holding the same slot.
+          if (offsetInSlot != 0)
+          {
+             consumed += take;
+             continue;
+          }
+          chan.awaitingBoundary = false;
        }
+
+       if (offsetInSlot == 0 && !chan.buffs[chan.tail].empty())
+       {
+          // a boundary reached with a slot already being filled: it is finished
+          chan.tail = (chan.tail + 1) % numBuffers;
+          chan.count++;
+
+          // notify readStream()
+          stream->cond.notify_one();
+          continue;
+       }
+
+       auto &buff = chan.buffs[chan.tail];
+
+       // a slot that is being started remembers where it starts, so that the two
+       // rings of a dual tuner stream can be checked against each other
+       if (buff.empty())
+       {
+          chan.firstSampleNum[chan.tail] = sampleNum;
+       }
+
+       const int spaceReqd = take * elementsPerSample * shortsPerWord;
+
+       // we do not reallocate here, as we only resize within
+       // the buffers capacity
+       buff.resize(buff.size() + spaceReqd);
+
+       // copy into the buffer queue
+       unsigned int i = 0;
+
+       if (useShort)
+       {
+          short *dptr = buff.data();
+          dptr += (buff.size() - spaceReqd);
+          for (i = 0; i < take; i++)
+          {
+              *dptr++ = xi[consumed + i];
+              *dptr++ = xq[consumed + i];
+           }
+       }
+       else
+       {
+          float *dptr = (float *)buff.data();
+          dptr += ((buff.size() - spaceReqd) / shortsPerWord);
+          for (i = 0; i < take; i++)
+          {
+             *dptr++ = (float)xi[consumed + i] / 32768.0f;
+             *dptr++ = (float)xq[consumed + i] / 32768.0f;
+          }
+       }
+
+       consumed += take;
     }
 
     return;
@@ -240,6 +280,8 @@ SoapySDRPlay::SoapySDRPlayStream::Channel::Channel(size_t numBuffers,
     tail = 0;
     count = 0;
     currentBuff = 0;
+    // nothing is kept until the first slot boundary - see rx_callback()
+    awaitingBoundary = true;
 
     // allocate buffers
     buffs.resize(numBuffers);
@@ -305,6 +347,9 @@ void SoapySDRPlay::SoapySDRPlayStream::drain(void)
     {
        chan.tail = 0;
        chan.count = 0;
+       // Come back on a slot boundary rather than wherever the next packet
+       // happens to start, so that both tuners resume holding the same slot.
+       chan.awaitingBoundary = true;
        for (auto &buff : chan.buffs) buff.clear();
     }
 }
@@ -675,6 +720,13 @@ int SoapySDRPlay::acquireReadBuffer(SoapySDR::Stream *stream,
     // pairing has been lost. Handing that back would put one channel's samples
     // beside another moment in time of the other, which is worse than a gap:
     // everything buffered is dropped and the stream starts pairing again.
+    //
+    // A backstop rather than something that happens: rx_callback() cuts every
+    // slot at a multiple of slotFrames on both channels, so the two can no
+    // longer drift apart over a packet the API split on one tuner alone. The
+    // drain is expensive - a slot of dead air while the ring refills, which at
+    // 50 gain changes a second used to be the whole stream - so it is worth
+    // hearing about if it ever fires again.
     if (!sdrplay_stream->slotsAligned(handle))
     {
        SoapySDR_logf(SOAPY_SDR_WARNING, "dual tuner streams out of step - first sample %u vs %u",
