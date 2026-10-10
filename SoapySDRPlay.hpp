@@ -247,6 +247,10 @@ public:
 
     static std::string HWVertoString(unsigned char hwVer);
 
+    static sdrplay_api_If_kHzT stringToIfType(std::string ifType);
+
+    static std::string IfTypetoString(sdrplay_api_If_kHzT ifType);
+
     static sdrplay_api_RspDuoModeT stringToRSPDuoMode(std::string rspDuoMode);
 
     static std::string RSPDuoModetoString(sdrplay_api_RspDuoModeT rspDuoMode);
@@ -258,6 +262,9 @@ private:
      ******************************************************************/
 
     double getInputSampleRateAndDecimation(uint32_t output_sample_rate, unsigned int *decM, unsigned int *decEnable, sdrplay_api_If_kHzT *ifType) const;
+
+    // shared rate/IF application (caller must hold _general_state_mutex)
+    void applySampleRate(const double output_sample_rate);
 
     static sdrplay_api_Bw_MHzT getBwEnumForRate(double output_sample_rate);
 
@@ -320,6 +327,10 @@ private:
     int fs_changed;
     // event callback reporting device is unavailable
     bool device_unavailable;
+    // explicit "if_mode" request (sdrplay_api_IF_Undefined = untouched, automatic mapping)
+    sdrplay_api_If_kHzT ifModeRequest;
+    // last requested output sample rate, to re-apply after an "if_mode" change
+    double currentOutputRate;
     const int updateTimeout = 500;   // 500ms timeout for updates
 
 public:
