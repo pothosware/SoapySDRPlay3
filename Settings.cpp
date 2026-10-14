@@ -76,6 +76,8 @@ std::unordered_map<std::string, sdrplay_api_DeviceT*> SoapySDRPlay::selectedRSPD
 // must be opened immediately before it is selected, and 'selectedRSPDevices'
 // is shared by all of them.
 static std::mutex selectMutex;
+// an API session opened for a device whose select then failed, for the next one
+static bool spareApiSession = false;
 
 
 std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
@@ -2035,8 +2037,13 @@ void SoapySDRPlay::selectDevice(const std::string &serial,
 
 void SoapySDRPlay::selectDevice()
 {
-    if (selectedRSPDevices.count(rspDeviceId) > 0 &&
-        selectedRSPDevices.at(rspDeviceId) != &device) {
+    bool selectedElsewhere;
+    {
+        std::lock_guard<std::mutex> selectLock(selectMutex);
+        selectedElsewhere = selectedRSPDevices.count(rspDeviceId) > 0 &&
+                            selectedRSPDevices.at(rspDeviceId) != &device;
+    }
+    if (selectedElsewhere) {
         selectDevice(device.tuner, device.rspDuoMode, device.rspDuoSampleFreq,
                      deviceParams);
     }
@@ -2081,12 +2088,6 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
 
     // retrieve hwVer and serNo by API
     unsigned int nDevs = 0;
-
-    // the API session of the first device is the one the singleton opened
-    if (!selectedRSPDevices.empty() && !ownApiSession) {
-        sdrplay_api::open_session();
-        ownApiSession = true;
-    }
 
     DeviceApiLock deviceApiLock;
     sdrplay_api_DeviceT rspDevs[SDRPLAY_MAX_DEVICES];
@@ -2160,16 +2161,32 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     SoapySDR_logf(SOAPY_SDR_INFO, "tuner: %d", device.tuner);
     SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoSampleFreq: %lf", device.rspDuoSampleFreq);
 
+    // the first device is selected on the session the singleton opened; the
+    // others each need one of their own, opened just before they are selected
+    const bool needSession = !selectedRSPDevices.empty() && !ownApiSession;
+    if (needSession) {
+        if (spareApiSession) {
+            spareApiSession = false;
+        } else {
+            sdrplay_api::open_session();
+        }
+        ownApiSession = true;
+    }
+
     err = sdrplay_api_SelectDevice(&device);
     if (err != sdrplay_api_Success)
     {
+        if (needSession) {
+            // keep the session for the next attempt instead of opening another
+            ownApiSession = false;
+            spareApiSession = true;
+        }
         SoapySDR_logf(SOAPY_SDR_ERROR, "SelectDevice Error: %s", sdrplay_api_GetErrorString(err));
         throw std::runtime_error("SelectDevice() failed");
     }
     selectedRSPDevices[rspDeviceId] = &device;
 
     deviceApiLock.unlock();
-    selectLock.unlock();
 
     // Enable (= sdrplay_api_DbgLvl_Verbose) API calls tracing,
     // but only for debug purposes due to its performance impact.
