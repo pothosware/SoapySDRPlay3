@@ -375,9 +375,25 @@ public:
         {
             return ver;
         }
+        // The API selects only one device per sdrplay_api_Open() session (a
+        // second SelectDevice() fails with "Device already selected"), and a
+        // device is selected on the current session: the one opened last, or
+        // released last. acquire_session() must be called right before
+        // SelectDevice(): it opens a session unless the current one is idle.
+        // release_session() is called once the device is released or its
+        // select failed. Sessions are never closed one by one, as closing
+        // one makes the others unusable: the singleton closes the API once,
+        // at exit. Callers hold selectMutex.
+        // Known limitation: only the current session can be reused, so
+        // repeatedly releasing and reopening two or more devices can leave
+        // idle older sessions behind until exit (the API has no call to
+        // select on, or close, a single older session).
+        static void acquire_session();
+        static void release_session();
 
     private:
         static float ver;
+        static bool currentSessionIdle;
         sdrplay_api();
 
     public:

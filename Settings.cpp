@@ -72,6 +72,11 @@ private:
 
 std::unordered_map<std::string, sdrplay_api_DeviceT*> SoapySDRPlay::selectedRSPDevices;
 
+// Serializes selecting and releasing devices: a device's own API session
+// must be opened immediately before it is selected, and 'selectedRSPDevices'
+// is shared by all of them.
+static std::mutex selectMutex;
+
 
 std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
 {
@@ -2030,8 +2035,13 @@ void SoapySDRPlay::selectDevice(const std::string &serial,
 
 void SoapySDRPlay::selectDevice()
 {
-    if (selectedRSPDevices.count(rspDeviceId) > 0 &&
-        selectedRSPDevices.at(rspDeviceId) != &device) {
+    bool selectedElsewhere;
+    {
+        std::lock_guard<std::mutex> selectLock(selectMutex);
+        selectedElsewhere = selectedRSPDevices.count(rspDeviceId) > 0 &&
+                            selectedRSPDevices.at(rspDeviceId) != &device;
+    }
+    if (selectedElsewhere) {
         selectDevice(device.tuner, device.rspDuoMode, device.rspDuoSampleFreq,
                      deviceParams);
     }
@@ -2043,6 +2053,8 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
                                 double rspDuoSampleFreq,
                                 sdrplay_api_DeviceParamsT *thisDeviceParams)
 {
+    std::unique_lock<std::mutex> selectLock(selectMutex);
+
     sdrplay_api_ErrT err;
     if (selectedRSPDevices.count(rspDeviceId)) {
         sdrplay_api_DeviceT *currDevice = selectedRSPDevices.at(rspDeviceId);
@@ -2053,6 +2065,7 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
             SoapySDR_logf(SOAPY_SDR_ERROR, "ReleaseDevice Error: %s", sdrplay_api_GetErrorString(err));
             throw std::runtime_error("ReleaseDevice() failed");
         }
+        sdrplay_api::release_session();
     }
 
     // save all the device configuration so we can put it back later on
@@ -2147,9 +2160,13 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     SoapySDR_logf(SOAPY_SDR_INFO, "tuner: %d", device.tuner);
     SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoSampleFreq: %lf", device.rspDuoSampleFreq);
 
+    // each selected device needs an API session of its own, opened right
+    // before it is selected unless one is idle
+    sdrplay_api::acquire_session();
     err = sdrplay_api_SelectDevice(&device);
     if (err != sdrplay_api_Success)
     {
+        sdrplay_api::release_session();
         SoapySDR_logf(SOAPY_SDR_ERROR, "SelectDevice Error: %s", sdrplay_api_GetErrorString(err));
         throw std::runtime_error("SelectDevice() failed");
     }
@@ -2183,6 +2200,8 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
 
 void SoapySDRPlay::releaseDevice()
 {
+    std::lock_guard<std::mutex> selectLock(selectMutex);
+
     sdrplay_api_ErrT err;
     if (selectedRSPDevices.count(rspDeviceId)) {
         sdrplay_api_DeviceT *currDevice = selectedRSPDevices.at(rspDeviceId);
@@ -2197,6 +2216,7 @@ void SoapySDRPlay::releaseDevice()
             SoapySDR_logf(SOAPY_SDR_ERROR, "ReleaseDevice Error: %s", sdrplay_api_GetErrorString(err));
             throw std::runtime_error("ReleaseDevice() failed");
         }
+        sdrplay_api::release_session();
     }
 
     return;
