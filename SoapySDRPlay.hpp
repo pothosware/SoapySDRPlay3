@@ -290,6 +290,9 @@ private:
     int hwVer;
     std::string serNo;
     std::string cacheKey;
+    // whether this device has opened an API session of its own
+    bool ownApiSession = false;
+
     // RSP device id is used to identify the device in 'selectedRSPDevices'
     //  - serial number for RSP (except the RSPduo) and the RSPduo in non-slave mode
     //  - serial number/S for the RSPduo in slave mode
@@ -375,6 +378,12 @@ public:
         {
             return ver;
         }
+        // Opens another API session. The API selects only one device per
+        // session (a second SelectDevice() fails with "Device already
+        // selected"), so each device selected while another is gets its own.
+        // Sessions are not closed one by one: closing one makes the others
+        // unusable, so the singleton closes the API once, at exit.
+        static void open_session();
 
     private:
         static float ver;

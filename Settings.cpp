@@ -72,6 +72,11 @@ private:
 
 std::unordered_map<std::string, sdrplay_api_DeviceT*> SoapySDRPlay::selectedRSPDevices;
 
+// Serializes selecting and releasing devices: a device's own API session
+// must be opened immediately before it is selected, and 'selectedRSPDevices'
+// is shared by all of them.
+static std::mutex selectMutex;
+
 
 std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
 {
@@ -2043,6 +2048,8 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
                                 double rspDuoSampleFreq,
                                 sdrplay_api_DeviceParamsT *thisDeviceParams)
 {
+    std::unique_lock<std::mutex> selectLock(selectMutex);
+
     sdrplay_api_ErrT err;
     if (selectedRSPDevices.count(rspDeviceId)) {
         sdrplay_api_DeviceT *currDevice = selectedRSPDevices.at(rspDeviceId);
@@ -2074,6 +2081,12 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
 
     // retrieve hwVer and serNo by API
     unsigned int nDevs = 0;
+
+    // the API session of the first device is the one the singleton opened
+    if (!selectedRSPDevices.empty() && !ownApiSession) {
+        sdrplay_api::open_session();
+        ownApiSession = true;
+    }
 
     DeviceApiLock deviceApiLock;
     sdrplay_api_DeviceT rspDevs[SDRPLAY_MAX_DEVICES];
@@ -2156,6 +2169,7 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     selectedRSPDevices[rspDeviceId] = &device;
 
     deviceApiLock.unlock();
+    selectLock.unlock();
 
     // Enable (= sdrplay_api_DbgLvl_Verbose) API calls tracing,
     // but only for debug purposes due to its performance impact.
@@ -2183,6 +2197,8 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
 
 void SoapySDRPlay::releaseDevice()
 {
+    std::lock_guard<std::mutex> selectLock(selectMutex);
+
     sdrplay_api_ErrT err;
     if (selectedRSPDevices.count(rspDeviceId)) {
         sdrplay_api_DeviceT *currDevice = selectedRSPDevices.at(rspDeviceId);

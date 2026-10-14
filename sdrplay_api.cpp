@@ -59,3 +59,12 @@ SoapySDRPlay::sdrplay_api::~sdrplay_api()
         ::SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Close() failed: %s", sdrplay_api_GetErrorString(err));
     }
 }
+
+void SoapySDRPlay::sdrplay_api::open_session()
+{
+    sdrplay_api_ErrT err = sdrplay_api_Open();
+    if (err != sdrplay_api_Success) {
+        ::SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Open() Error: %s", sdrplay_api_GetErrorString(err));
+        throw std::runtime_error("sdrplay_api_Open() failed");
+    }
+}
