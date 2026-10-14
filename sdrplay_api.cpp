@@ -25,6 +25,7 @@
 #include "SoapySDRPlay.hpp"
 
 float SoapySDRPlay::sdrplay_api::ver = 0.0;
+bool SoapySDRPlay::sdrplay_api::currentSessionIdle = false;
 
 // Singleton class for SDRplay API (only one per process)
 SoapySDRPlay::sdrplay_api::sdrplay_api()
@@ -37,6 +38,7 @@ SoapySDRPlay::sdrplay_api::sdrplay_api()
         ::SoapySDR_logf(SOAPY_SDR_ERROR, "Please check the sdrplay_api service to make sure it is up. If it is up, please restart it.");
         throw std::runtime_error("sdrplay_api_Open() failed");
     }
+    currentSessionIdle = true;
 
     // Check API versions match
     err = sdrplay_api_ApiVersion(&ver);
@@ -60,11 +62,20 @@ SoapySDRPlay::sdrplay_api::~sdrplay_api()
     }
 }
 
-void SoapySDRPlay::sdrplay_api::open_session()
+void SoapySDRPlay::sdrplay_api::acquire_session()
 {
-    sdrplay_api_ErrT err = sdrplay_api_Open();
-    if (err != sdrplay_api_Success) {
-        ::SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Open() Error: %s", sdrplay_api_GetErrorString(err));
-        throw std::runtime_error("sdrplay_api_Open() failed");
+    get_instance();
+    if (!currentSessionIdle) {
+        sdrplay_api_ErrT err = sdrplay_api_Open();
+        if (err != sdrplay_api_Success) {
+            ::SoapySDR_logf(SOAPY_SDR_ERROR, "sdrplay_api_Open() Error: %s", sdrplay_api_GetErrorString(err));
+            throw std::runtime_error("sdrplay_api_Open() failed");
+        }
     }
+    currentSessionIdle = false;
+}
+
+void SoapySDRPlay::sdrplay_api::release_session()
+{
+    currentSessionIdle = true;
 }

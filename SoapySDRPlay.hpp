@@ -290,9 +290,6 @@ private:
     int hwVer;
     std::string serNo;
     std::string cacheKey;
-    // whether this device has opened an API session of its own
-    bool ownApiSession = false;
-
     // RSP device id is used to identify the device in 'selectedRSPDevices'
     //  - serial number for RSP (except the RSPduo) and the RSPduo in non-slave mode
     //  - serial number/S for the RSPduo in slave mode
@@ -378,15 +375,21 @@ public:
         {
             return ver;
         }
-        // Opens another API session. The API selects only one device per
-        // session (a second SelectDevice() fails with "Device already
-        // selected"), so each device selected while another is gets its own.
-        // Sessions are not closed one by one: closing one makes the others
-        // unusable, so the singleton closes the API once, at exit.
-        static void open_session();
+        // The API selects only one device per sdrplay_api_Open() session (a
+        // second SelectDevice() fails with "Device already selected"), and a
+        // device is selected on the current session: the one opened last, or
+        // released last. acquire_session() must be called right before
+        // SelectDevice(): it opens a session unless the current one is idle.
+        // release_session() is called once the device is released or its
+        // select failed. Sessions are never closed one by one, as closing
+        // one makes the others unusable: the singleton closes the API once,
+        // at exit. Callers hold selectMutex.
+        static void acquire_session();
+        static void release_session();
 
     private:
         static float ver;
+        static bool currentSessionIdle;
         sdrplay_api();
 
     public:

@@ -76,8 +76,6 @@ std::unordered_map<std::string, sdrplay_api_DeviceT*> SoapySDRPlay::selectedRSPD
 // must be opened immediately before it is selected, and 'selectedRSPDevices'
 // is shared by all of them.
 static std::mutex selectMutex;
-// an API session opened for a device whose select then failed, for the next one
-static bool spareApiSession = false;
 
 
 std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
@@ -2067,6 +2065,7 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
             SoapySDR_logf(SOAPY_SDR_ERROR, "ReleaseDevice Error: %s", sdrplay_api_GetErrorString(err));
             throw std::runtime_error("ReleaseDevice() failed");
         }
+        sdrplay_api::release_session();
     }
 
     // save all the device configuration so we can put it back later on
@@ -2161,26 +2160,13 @@ void SoapySDRPlay::selectDevice(sdrplay_api_TunerSelectT tuner,
     SoapySDR_logf(SOAPY_SDR_INFO, "tuner: %d", device.tuner);
     SoapySDR_logf(SOAPY_SDR_INFO, "rspDuoSampleFreq: %lf", device.rspDuoSampleFreq);
 
-    // the first device is selected on the session the singleton opened; the
-    // others each need one of their own, opened just before they are selected
-    const bool needSession = !selectedRSPDevices.empty() && !ownApiSession;
-    if (needSession) {
-        if (spareApiSession) {
-            spareApiSession = false;
-        } else {
-            sdrplay_api::open_session();
-        }
-        ownApiSession = true;
-    }
-
+    // each selected device needs an API session of its own, opened right
+    // before it is selected unless one is idle
+    sdrplay_api::acquire_session();
     err = sdrplay_api_SelectDevice(&device);
     if (err != sdrplay_api_Success)
     {
-        if (needSession) {
-            // keep the session for the next attempt instead of opening another
-            ownApiSession = false;
-            spareApiSession = true;
-        }
+        sdrplay_api::release_session();
         SoapySDR_logf(SOAPY_SDR_ERROR, "SelectDevice Error: %s", sdrplay_api_GetErrorString(err));
         throw std::runtime_error("SelectDevice() failed");
     }
@@ -2230,6 +2216,7 @@ void SoapySDRPlay::releaseDevice()
             SoapySDR_logf(SOAPY_SDR_ERROR, "ReleaseDevice Error: %s", sdrplay_api_GetErrorString(err));
             throw std::runtime_error("ReleaseDevice() failed");
         }
+        sdrplay_api::release_session();
     }
 
     return;
