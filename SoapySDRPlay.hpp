@@ -160,6 +160,20 @@ public:
 
     SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
 
+    // Aggregate ("overall amplification") gain overloads. These are what
+    // SoapySDR::Device::setGain(dir,chan,value) etc. normally inherit; issue
+    // #110 is that the inherited versions run backwards because the two gain
+    // elements are reductions. When the "monotonic_gain" setting is enabled we
+    // override them with a single monotonically non-decreasing overall gain in
+    // dB; when disabled (default) we delegate to the base-class behavior so
+    // nothing changes. The named IFGR/RFGR overloads above are untouched either
+    // way.
+    void setGain(const int direction, const size_t channel, const double value);
+
+    double getGain(const int direction, const size_t channel) const;
+
+    SoapySDR::Range getGainRange(const int direction, const size_t channel) const;
+
     /*******************************************************************
      * Frequency API
      ******************************************************************/
@@ -320,6 +334,14 @@ private:
     int fs_changed;
     // event callback reporting device is unavailable
     bool device_unavailable;
+    // issue #110 prototype: when true, the aggregate setGain/getGain/getGainRange
+    // overloads express a single monotonically non-decreasing overall gain in dB
+    // instead of the (backwards) inherited behavior. Opt-in via the
+    // "monotonic_gain" setting / device-string arg; default false (legacy).
+    bool overallGainMonotonic;
+    // RF/LNA gain-reduction (dB) table for the current device and frequency band,
+    // indexed by LNAstate; not monotonic in LNAstate (see getClosestLNAstate).
+    std::vector<int> currentRfGrValues() const;
     const int updateTimeout = 500;   // 500ms timeout for updates
 
 public:

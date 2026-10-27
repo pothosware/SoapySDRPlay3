@@ -102,6 +102,10 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     // change the default AGC set point to -30dBfs
     chParams->ctrlParams.agc.setPoint_dBfs = -30;
 
+    // issue #110 prototype: overall-gain direction is legacy unless opted in
+    // (can be flipped here or via the "monotonic_gain" device-string arg below)
+    overallGainMonotonic = false;
+
     // process additional device string arguments
     for (std::pair<std::string, std::string> arg : args) {
         // ignore 'driver', 'label', 'mode', 'serial', and 'soapy'
@@ -675,6 +679,204 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
       return SoapySDR::Range(0, 27);
    }
     return SoapySDR::Range(20, 59);
+}
+
+/*******************************************************************
+ * Overall ("aggregate") gain  --  issue #110 prototype
+ *
+ * The named gain elements IFGR (gRdB, IF gain *reduction*, 20..59 dB) and RFGR
+ * (LNAstate, an index into the per-band RF gain *reduction* table) both run
+ * OPPOSITE to SoapySDR's convention that a larger value means more gain. The
+ * inherited aggregate setGain()/getGain()/getGainRange() therefore behave
+ * backwards (a larger overall value -> more reduction -> less gain), which
+ * breaks callers such as dump1090 that expect setGain(dir,chan,value) to be
+ * monotonically non-decreasing.
+ *
+ * When the "monotonic_gain" setting is enabled, these overrides express a
+ * single overall gain in dB = -(gRdB + rfGR[LNAstate]): a larger value always
+ * yields more hardware gain. The RF table is NOT monotonic in LNAstate (e.g.
+ * RSP2 1-2 GHz), so the LNAstate for a requested gain is found by a linear
+ * nearest search, mirroring gr-sdrplay3. The named IFGR/RFGR overloads are left
+ * exactly as they are, so legacy callers that read/set them directly are
+ * unaffected. When disabled (default) these delegate to the SoapySDR base
+ * class, i.e. precisely the pre-#110 behavior.
+ *
+ * RF gain-reduction tables are taken from gr-sdrplay3 (SDRplay API spec v3.15,
+ * section 5). RSPdx-R2 reuses the RSPdx tables (prototype approximation).
+ ******************************************************************/
+
+// Per-device, per-band RF/LNA gain-reduction values (dB), indexed by LNAstate.
+// `flag` is highz (RSP2/RSPduo AM port 1) or HDR (RSPdx/RSPdxR2).
+static const std::vector<int> &rfGrTable(unsigned char hwVer, double freq, bool flag)
+{
+   static const std::vector<int> empty;
+   if (hwVer == SDRPLAY_RSP1_ID) {
+      if      (freq <= 420e6)  { static const std::vector<int> v = {0,24,19,43}; return v; }
+      else if (freq <= 1000e6) { static const std::vector<int> v = {0,7,19,26}; return v; }
+      else if (freq <= 2000e6) { static const std::vector<int> v = {0,5,19,24}; return v; }
+   } else if (hwVer == SDRPLAY_RSP1A_ID) {
+      if      (freq <= 60e6)   { static const std::vector<int> v = {0,6,12,18,37,42,61}; return v; }
+      else if (freq <= 420e6)  { static const std::vector<int> v = {0,6,12,18,20,26,32,38,57,62}; return v; }
+      else if (freq <= 1000e6) { static const std::vector<int> v = {0,7,13,19,20,27,33,39,45,64}; return v; }
+      else if (freq <= 2000e6) { static const std::vector<int> v = {0,6,12,20,26,32,38,43,62}; return v; }
+   } else if (hwVer == SDRPLAY_RSP1B_ID) {
+      if      (freq <= 50e6)   { static const std::vector<int> v = {0,6,12,18,37,42,61}; return v; }
+      else if (freq <= 60e6)   { static const std::vector<int> v = {0,6,12,18,20,26,32,38,57,62}; return v; }
+      else if (freq <= 420e6)  { static const std::vector<int> v = {0,6,12,18,20,26,32,38,57,62}; return v; }
+      else if (freq <= 1000e6) { static const std::vector<int> v = {0,7,13,19,20,27,33,39,45,64}; return v; }
+      else if (freq <= 2000e6) { static const std::vector<int> v = {0,6,12,20,26,32,38,43,62}; return v; }
+   } else if (hwVer == SDRPLAY_RSP2_ID) {
+      if      (freq <= 60e6 && flag) { static const std::vector<int> v = {0,6,12,18,37}; return v; }
+      else if (freq <= 420e6)  { static const std::vector<int> v = {0,10,15,21,24,34,39,45,64}; return v; }
+      else if (freq <= 1000e6) { static const std::vector<int> v = {0,7,10,17,22,41}; return v; }
+      else if (freq <= 2000e6) { static const std::vector<int> v = {0,5,21,15,15,34}; return v; }
+   } else if (hwVer == SDRPLAY_RSPduo_ID) {
+      if      (freq <= 60e6 && !flag) { static const std::vector<int> v = {0,6,12,18,37,42,61}; return v; }
+      else if (freq <= 60e6 && flag)  { static const std::vector<int> v = {0,6,12,18,37}; return v; }
+      else if (freq <= 420e6)  { static const std::vector<int> v = {0,6,12,18,20,26,32,38,57,62}; return v; }
+      else if (freq <= 1000e6) { static const std::vector<int> v = {0,7,13,19,20,27,33,39,45,64}; return v; }
+      else if (freq <= 2000e6) { static const std::vector<int> v = {0,6,12,20,26,32,38,43,62}; return v; }
+   } else if (hwVer == SDRPLAY_RSPdx_ID || hwVer == SDRPLAY_RSPdxR2_ID) {
+      if      (freq <= 2e6 && flag) { static const std::vector<int> v = {0,3,6,9,12,15,18,21,24,25,27,30,33,36,39,42,45,48,51,54,57,60}; return v; }
+      else if (freq <= 12e6)   { static const std::vector<int> v = {0,3,6,9,12,15,24,27,30,33,36,39,42,45,48,51,54,57,60}; return v; }
+      else if (freq <= 50e6)   { static const std::vector<int> v = {0,3,6,9,12,15,18,24,27,30,33,36,39,42,45,48,51,54,57,60}; return v; }
+      else if (freq <= 60e6)   { static const std::vector<int> v = {0,3,6,9,12,20,23,26,29,32,35,38,44,47,50,53,56,59,62,65,68,71,74,77,80}; return v; }
+      else if (freq <= 250e6)  { static const std::vector<int> v = {0,3,6,9,12,15,24,27,30,33,36,39,42,45,48,51,54,57,60,63,66,69,72,75,78,81,84}; return v; }
+      else if (freq <= 420e6)  { static const std::vector<int> v = {0,3,6,9,12,15,18,24,27,30,33,36,39,42,45,48,51,54,57,60,63,66,69,72,75,78,81,84}; return v; }
+      else if (freq <= 1000e6) { static const std::vector<int> v = {0,7,10,13,16,19,22,25,31,34,37,40,43,46,49,52,55,58,61,64,67}; return v; }
+      else if (freq <= 2000e6) { static const std::vector<int> v = {0,5,8,11,14,17,20,32,35,38,41,44,47,50,53,56,59,62,65}; return v; }
+   }
+   return empty;
+}
+
+std::vector<int> SoapySDRPlay::currentRfGrValues() const
+{
+   double freq = chParams->tunerParams.rfFreq.rfHz;
+   bool flag = false;
+   if (device.hwVer == SDRPLAY_RSPduo_ID) {
+      flag = (device.tuner == sdrplay_api_Tuner_A &&
+              chParams->rspDuoTunerParams.tuner1AmPortSel == sdrplay_api_RspDuo_AMPORT_1);
+   } else if (device.hwVer == SDRPLAY_RSP2_ID) {
+      flag = (chParams->rsp2TunerParams.amPortSel == sdrplay_api_Rsp2_AMPORT_1);
+   } else if (device.hwVer == SDRPLAY_RSPdx_ID || device.hwVer == SDRPLAY_RSPdxR2_ID) {
+      flag = (deviceParams->devParams && deviceParams->devParams->rspDxParams.hdrEnable);
+   }
+   return rfGrTable(device.hwVer, freq, flag);
+}
+
+// IF gain-reduction bounds (dB); see getGainRange("IFGR").
+static const int IFGR_MIN = 20;
+static const int IFGR_MAX = 59;
+
+SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
+{
+   if (!overallGainMonotonic)
+      return SoapySDR::Device::getGainRange(direction, channel);
+
+   std::lock_guard <std::mutex> lock(_general_state_mutex);
+   std::vector<int> rfGr = currentRfGrValues();
+   if (rfGr.empty())
+      return SoapySDR::Device::getGainRange(direction, channel);
+
+   int minRf = rfGr[0], maxRf = rfGr[0];
+   for (int g : rfGr) { if (g < minRf) minRf = g; if (g > maxRf) maxRf = g; }
+   // overall gain (dB) = -(gRdB + rfGR); most gain = least total reduction
+   double maxGain = -(double)(IFGR_MIN + minRf);
+   double minGain = -(double)(IFGR_MAX + maxRf);
+   return SoapySDR::Range(minGain, maxGain, 1.0);
+}
+
+double SoapySDRPlay::getGain(const int direction, const size_t channel) const
+{
+   if (!overallGainMonotonic)
+      return SoapySDR::Device::getGain(direction, channel);
+
+   std::lock_guard <std::mutex> lock(_general_state_mutex);
+   std::vector<int> rfGr = currentRfGrValues();
+   if (rfGr.empty())
+      return SoapySDR::Device::getGain(direction, channel);
+
+   int state = chParams->tunerParams.gain.LNAstate;
+   int rfgr = (state >= 0 && state < (int)rfGr.size()) ? rfGr[state] : 0;
+   return -(double)((int)chParams->tunerParams.gain.gRdB + rfgr);
+}
+
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+{
+   if (!overallGainMonotonic) {
+      SoapySDR::Device::setGain(direction, channel, value);
+      return;
+   }
+   if (direction != SOAPY_SDR_RX) return;
+
+   std::lock_guard <std::mutex> lock(_general_state_mutex);
+   std::vector<int> rfGr = currentRfGrValues();
+   if (rfGr.empty()) {
+      SoapySDR_log(SOAPY_SDR_WARNING, "monotonic_gain: no RF gain table for this device/band; overall setGain ignored");
+      return;
+   }
+
+   int minRf = rfGr[0], maxRf = rfGr[0];
+   for (int g : rfGr) { if (g < minRf) minRf = g; if (g > maxRf) maxRf = g; }
+   // clamp to the achievable overall-gain range (bonus point 1 from #110)
+   double minGain = -(double)(IFGR_MAX + maxRf);
+   double maxGain = -(double)(IFGR_MIN + minRf);
+   double v = value < minGain ? minGain : (value > maxGain ? maxGain : value);
+
+   // target total gain reduction = gRdB + rfGR
+   int targetTotalGr = (int)((-v) + 0.5);
+
+   bool agc = chParams->ctrlParams.agc.enable != sdrplay_api_AGC_DISABLE;
+   int curGRdB = (int)chParams->tunerParams.gain.gRdB;
+
+   // pick the (LNAstate, gRdB) whose total reduction is closest to the target
+   // (nearest supportable setting -- bonus point 2). Linear scan because the RF
+   // table is not monotonic in LNAstate.
+   int bestState = chParams->tunerParams.gain.LNAstate;
+   int bestGRdB = curGRdB;
+   int bestErr = 1 << 30;
+   for (int s = 0; s < (int)rfGr.size(); ++s) {
+      // with AGC on, the IF reduction is hardware-controlled: hold it fixed and
+      // only move the LNA, so we approximate using the current gRdB
+      int g = agc ? curGRdB : (targetTotalGr - rfGr[s]);
+      if (g < IFGR_MIN) g = IFGR_MIN;
+      if (g > IFGR_MAX) g = IFGR_MAX;
+      int achieved = rfGr[s] + g;
+      int err = achieved > targetTotalGr ? achieved - targetTotalGr : targetTotalGr - achieved;
+      // tie-break: keep IF reduction near mid-range for headroom
+      if (err < bestErr ||
+          (err == bestErr && abs(g - (IFGR_MIN + IFGR_MAX) / 2) < abs(bestGRdB - (IFGR_MIN + IFGR_MAX) / 2))) {
+         bestErr = err; bestState = s; bestGRdB = g;
+      }
+   }
+
+   bool doUpdate = false;
+   if (chParams->tunerParams.gain.LNAstate != bestState) {
+      chParams->tunerParams.gain.LNAstate = (unsigned char)bestState;
+      doUpdate = true;
+   }
+   if (!agc && (int)chParams->tunerParams.gain.gRdB != bestGRdB) {
+      chParams->tunerParams.gain.gRdB = bestGRdB;
+      doUpdate = true;
+   }
+   if (agc) {
+      SoapySDR_log(SOAPY_SDR_WARNING, "monotonic_gain: AGC is enabled; only the RF (LNA) part of the overall gain was set");
+   }
+
+   if (doUpdate && streamActive) {
+      gr_changed = 0;
+      sdrplay_api_ErrT err = sdrplay_api_Update(device.dev, device.tuner, sdrplay_api_Update_Tuner_Gr, sdrplay_api_Update_Ext1_None);
+      if (err != sdrplay_api_Success) {
+         SoapySDR_logf(SOAPY_SDR_WARNING, "sdrplay_api_Update(Tuner_Gr) Error: %s", sdrplay_api_GetErrorString(err));
+         return;
+      }
+      for (int i = 0; i < updateTimeout; ++i) {
+         if (gr_changed != 0) break;
+         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+      if (gr_changed == 0)
+         SoapySDR_log(SOAPY_SDR_WARNING, "Gain reduction update timeout.");
+   }
 }
 
 /*******************************************************************
@@ -1453,6 +1655,15 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     IQcorrArg.type = SoapySDR::ArgInfo::BOOL;
     setArgs.push_back(IQcorrArg);
 
+    // issue #110 prototype opt-in
+    SoapySDR::ArgInfo monotonicGainArg;
+    monotonicGainArg.key = "monotonic_gain";
+    monotonicGainArg.value = "false";
+    monotonicGainArg.name = "Monotonic overall gain";
+    monotonicGainArg.description = "Make the aggregate setGain()/getGain() monotonically non-decreasing in dB (named IFGR/RFGR unchanged)";
+    monotonicGainArg.type = SoapySDR::ArgInfo::BOOL;
+    setArgs.push_back(monotonicGainArg);
+
     SoapySDR::ArgInfo SetPointArg;
     SetPointArg.key = "agc_setpoint";
     SetPointArg.value = "-30";
@@ -1652,7 +1863,13 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    }
    else
 #endif
-   if (key == "iqcorr_ctrl")
+   if (key == "monotonic_gain")
+   {
+      // issue #110 prototype opt-in: make the aggregate setGain/getGain/
+      // getGainRange monotonically non-decreasing. Named IFGR/RFGR unaffected.
+      overallGainMonotonic = (value == "true" || value == "1");
+   }
+   else if (key == "iqcorr_ctrl")
    {
       if (value == "false") chParams->ctrlParams.dcOffset.IQenable = 0;
       else                  chParams->ctrlParams.dcOffset.IQenable = 1;
@@ -1874,7 +2091,11 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     }
     else
 #endif
-    if (key == "iqcorr_ctrl")
+    if (key == "monotonic_gain")
+    {
+       return overallGainMonotonic ? "true" : "false";
+    }
+    else if (key == "iqcorr_ctrl")
     {
        if (chParams->ctrlParams.dcOffset.IQenable == 0) return "false";
        else                                             return "true";
